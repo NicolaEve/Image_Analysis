@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Plot 10x</title>
+
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+      <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js">
+      </script>
+      <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js">
+      </script>
+</head>
+<body>
+<p><h4>plot 1, inline, profile x</h4></p>
+ {% autoescape off %}
+  {{ plot_div }}
+  {% endautoescape %}
+<p><h4>symmetry is {{symm_x}}</h4></p>
+<p><h4>flatness is {{flattness_x}}</h4></p>
+<p><h4>plot 2, crossline, profile y</h4></p>
+{% autoescape off %}
+  {{ plot_div_2 }}
+  {% endautoescape %}
+<p><h4>symmetry is {{symm_y}}</h4></p>
+<p><h4>flatness is {{flattness_y}}</h4></p>
+</body>
+</html>
