@@ -1,5 +1,5 @@
 """
-Views processes user response and makes new displays to the user i.e. plots
+Views processes user response and redirects user to new displays
 
 Author: Nicola Compton
 Date: 24th May 2021
@@ -119,7 +119,7 @@ def beam_energy_10x_display_plot(request):
         return render(request, 'BeamEnergy10xPlot.html',
                       context={'plot_div': plot_div, 'plot_div_2': plot_div_2,
                                'symm_x': inline[2], 'symm_y': crossline[2],
-                               'flattness_x': inline[3], 'flattness_y': crossline[3]})
+                               'flatness_x': inline[3], 'flatness_y': crossline[3]})
 
 
 def beam_energy_6x_display_plot(request):
@@ -146,7 +146,7 @@ def beam_energy_6x_display_plot(request):
         return render(request, 'BeamEnergy6xPlot.html',
                       context={'plot_div': plot_div, 'plot_div_2': plot_div_2,
                                'symm_x': inline[2], 'symm_y': crossline[2],
-                               'flattness_x': inline[3], 'flattness_y': crossline[3]})
+                               'flatness_x': inline[3], 'flatness_y': crossline[3]})
 
 
 def beam_energy_10fff_display_plot(request):
@@ -173,7 +173,7 @@ def beam_energy_10fff_display_plot(request):
         return render(request, 'BeamEnergy10fffPlot.html',
                       context={'plot_div': plot_div, 'plot_div_2': plot_div_2,
                                'symm_x': inline[2], 'symm_y': crossline[2],
-                               'flattness_x': inline[3], 'flattness_y': crossline[3]})
+                               'flatness_x': inline[3], 'flatness_y': crossline[3]})
 
 
 def most_recent_plot(request):

@@ -3,15 +3,16 @@ Models defines the database objects for the app.
 
 This script also contains code for symmetry and flatness metrics.
 
+TransformView class is where the calibration matrix is applied to the newly uploaded image
+
 Author: Nicola Compton
 Date: 24th May 2021
 Contact: nicola.compton@ulh.nhs.uk
 """
 
 from django.db import models
-from django import forms
 from . import run_calibration
-from .main import Edges, Image, Profiles
+from .main import Edges, Image, Profiles, normalise
 import numpy as np
 
 #class Index(models.Model):
@@ -86,17 +87,6 @@ class TransformView(models.Model):
 
         return centre
 
-    def normalise_again(self, x_array, y_array):
-        """ Normalise the array by setting f(0)=1 i.e. dividing all values by the value at f(0)"""
-
-        # find closest x value to 0 in the original array
-        x_array = np.asarray(x_array)
-        index = (np.abs(x_array - 0)).argmin()
-
-        # divide all values in the array by f(0)
-        normalised_array = [value / y_array[index] for value in y_array]
-
-        return x_array, normalised_array
 
     def process_profile(self, profile, centre_cood):
         """ Input: profile = x or y profile; centre_cood = corresponding x or y central co-ordinate
@@ -106,9 +96,10 @@ class TransformView(models.Model):
         xs = np.linspace(0, len(profile), len(profile))
         shifted_xs = [(x - int(centre_cood)) * 0.0336 for x in xs]
         # normalise profile
-        x_array, normalised_array= self.normalise_again(shifted_xs, profile)
+        normalised_array= normalise(shifted_xs, profile)
 
-        return x_array, normalised_array
+        return shifted_xs, normalised_array
+
 
     def core_80(self, x_array, profile):
         """ Get the central 80% of the field """
@@ -163,7 +154,7 @@ class TransformView(models.Model):
 
         return symmetry
 
-    def flattness(self, x_array, transformed_profile):
+    def flatness(self, x_array, transformed_profile):
         """ Find the flatness of the field, in the middle 80% """
 
         # find percentage difference of the values in the middle 80%
@@ -213,8 +204,8 @@ class TransformView(models.Model):
         symmetry_x = self.symmetry(x_array_x, transformed_profile_x)
         symmetry_y = self.symmetry(x_array_y, transformed_profile_y)
 
-        flattness_x = self.flattness(x_array_x, transformed_profile_x)
-        flattness_y = self.flattness(x_array_y, transformed_profile_y)
+        flatness_x = self.flatness(x_array_x, transformed_profile_x)
+        flatness_y = self.flatness(x_array_y, transformed_profile_y)
 
-        return [x_array_x, transformed_profile_x, symmetry_x, flattness_x], \
-               [x_array_y, transformed_profile_y, symmetry_y, flattness_y]
+        return [x_array_x, transformed_profile_x, symmetry_x, flatness_x], \
+               [x_array_y, transformed_profile_y, symmetry_y, flatness_y]
