@@ -21,6 +21,7 @@ import shutil
 
 # set the directory where uploaded images are saved to
 media_directory = os.path.join(os.getcwd(), "media\images")
+xim_directory = os.path.join(media_directory, "XIMdata")
 
 
 class Index(ListView):
@@ -30,10 +31,14 @@ class Index(ListView):
 def beam_energy_6x(request):
     if request.method == 'POST':
         form = BeamEnergy6xForm(request.POST, request.FILES)
-        # delete all files saved in there before uploading new one to save storage
+        # delete all files saved in there before uploading new one to save storage and ensure we plot from the correct file!
         for file in os.listdir(media_directory):
             if file.endswith(".png") or file.endswith(".xim"):
                 os.remove(os.path.join(media_directory, file))
+
+        for file in os.listdir(xim_directory):
+            if file.endswith(".png") or file.endswith(".xim"):
+                os.remove(os.path.join(xim_directory, file))
 
         # then save the newly uploaded file
         if form.is_valid():
@@ -53,6 +58,10 @@ def beam_energy_10fff(request):
             if file.endswith(".png") or file.endswith(".xim"):
                 os.remove(os.path.join(media_directory, file))
 
+        for file in os.listdir(xim_directory):
+            if file.endswith(".png") or file.endswith(".xim"):
+                os.remove(os.path.join(xim_directory, file))
+
         # then save the newly uploaded file
         if form.is_valid():
             form.save()
@@ -71,6 +80,10 @@ def beam_energy_10x(request):
             if file.endswith(".png") or file.endswith(".xim"):
                 os.remove(os.path.join(media_directory, file))
 
+        for file in os.listdir(xim_directory):
+            if file.endswith(".png") or file.endswith(".xim"):
+                os.remove(os.path.join(xim_directory, file))
+
         # then save the newly uploaded file
         if form.is_valid():
             form.save()
@@ -84,16 +97,16 @@ def beam_energy_10x(request):
 def beam_energy_10x_display_plot(request):
 
     if request.method == 'GET':
+        # there will only be one file in the media uploads
         # convert files in the media directory from xim to png
         ximmer = os.path.join(media_directory, "ximmerAll.py")
         cmd = str("python " + ximmer + " -d " + media_directory)
         os.system(cmd)
 
-        # there will only be one file in the media uploads
-        dir = os.path.join(media_directory, "XIMdata")
-        for file in os.listdir(dir):
+        # there will only be one file in the xim directory
+        for file in os.listdir(xim_directory):
             if file.endswith(".png") or file.endswith(".jpeg"):
-                filename = os.path.join(dir, file)
+                filename = os.path.join(xim_directory, file)
 
         inline, crossline = TransformView("10x", filename).transform()
 
@@ -117,11 +130,10 @@ def beam_energy_6x_display_plot(request):
         cmd = str("python " + ximmer + " -d " + media_directory)
         os.system(cmd)
 
-        # there will only be one file in the media uploads
-        dir = os.path.join(media_directory, "XIMdata")
-        for file in os.listdir(dir):
+        # there will only be one file in the xim directory
+        for file in os.listdir(xim_directory):
             if file.endswith(".png") or file.endswith(".jpeg"):
-                filename = os.path.join(dir, file)
+                filename = os.path.join(xim_directory, file)
 
         inline, crossline = TransformView("6x", filename).transform()
 
@@ -145,11 +157,10 @@ def beam_energy_10fff_display_plot(request):
         cmd = str("python " + ximmer + " -d " + media_directory)
         os.system(cmd)
 
-        # there will only be one file in the media uploads
-        dir = os.path.join(media_directory, "XIMdata")
-        for file in os.listdir(dir):
+        # there will only be one file in the xim directory
+        for file in os.listdir(xim_directory):
             if file.endswith(".png") or file.endswith(".jpeg"):
-                filename = os.path.join(dir, file)
+                filename = os.path.join(xim_directory, file)
 
         inline, crossline = TransformView("10fff", filename).transform()
 

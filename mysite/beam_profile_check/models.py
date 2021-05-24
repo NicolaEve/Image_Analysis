@@ -163,7 +163,6 @@ class TransformView(models.Model):
 
         return symmetry
 
-
     def flattness(self, x_array, transformed_profile):
         """ Find the flatness of the field, in the middle 80% """
 

@@ -199,7 +199,6 @@ class Profiles:
 
         return field_size_cm
 
-
     def plot_sobel_corners(self):
         """ Plot the sobel image with peaks
             (peaks are the edges of the field) """
@@ -240,8 +239,6 @@ class Profiles:
         # plot x profile
         plt.plot(np.linspace(1, len(noisy_x[0]), len(noisy_x[0])), noisy_x[0], label="Noisy")
         plt.plot(np.linspace(1, len(filtered_x[0]), len(filtered_x[0])), filtered_x[0], label="Filtered")
-        #plt.plot(np.linspace(-1, 1, len(noisy_x[0])), noisy_x[0], label="Noisy") # to plot so it's reflected in y axis
-        #plt.plot(np.linspace(-1, 1, len(filtered_x[0])), filtered_x[0], label="Filtered")
         plt.title("X Profile")
         plt.legend()
         plt.show()
@@ -252,7 +249,6 @@ class Profiles:
         plt.title("Y Profile")
         plt.legend()
         plt.show()
-
 
 
 class Transform:
@@ -312,7 +308,6 @@ class Transform:
         # but how to find derivative of a list?
 
         return distance
-
 
     def plot(self, inline):
         """ Plot the interpolated, normalised profiles and the ratio between them """
@@ -387,7 +382,6 @@ class Transform:
             for m in range(len(profile_y)):
                 if n != x and m != y:
                     dose_matrix[n, m] = dose_matrix[n][y] * dose_matrix[x][m]
-
 
         return dose_matrix
 
