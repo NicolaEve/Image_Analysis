@@ -12,9 +12,9 @@ Contact: nicola.compton@ulh.nhs.uk
 from django.test import TestCase
 
 import unittest
-from .main import Image, Edges, Profiles, Transform
+from .main import Image, Edges, Profiles, Transform, normalise, interpolate
 from .run_calibration import SNC
-from .models import TransformView
+#from .models import TransformView
 import numpy as np
 import matplotlib
 from matplotlib import testing
@@ -122,11 +122,6 @@ class TransformTests(unittest.TestCase):
 
         self.transform = Transform(df_list, profile_list, centre)
 
-    def test_normalise(self):
-        """ Test the normalising function """
-        inline = self.transform.df_list[0]
-        normalised = self.transform.normalise(inline[0], inline[1])
-        np.testing.assert_array_equal(normalised, np.array([3, 2, 1, 2, 3]))
 
     def test_dose_matrix(self):
         """ Test the dose matrix function returns the correct ratios """
@@ -140,6 +135,35 @@ class TransformTests(unittest.TestCase):
 
     def tearDown(self):
         """Run post each test."""
+        pass
+
+
+class StaticTests(unittest.TestCase):
+    """ Class to test static functions """
+
+    def setUp(self):
+        """ Run prior to each test."""
+        self.normalise = normalise
+        self.interpolate = interpolate
+
+    def test_normalise(self):
+        """ Test the normalising function """
+        inline = [[-2, -1, 0, 1, 2], [30, 20, 10, 20, 30]]
+        normalised = self.normalise(inline[0], inline[1])
+        np.testing.assert_array_equal(normalised, np.array([3, 2, 1, 2, 3]))
+
+    def test_interpolate(self):
+        """ Test the interpolation function """
+        df = [[-2, -1, 0, 1, 2], [10, 20, 30, 40, 50]]
+        array = np.ones((1, 10))
+        expected_xs = np.linspace(-2, 0, 10)
+        expected_ys = np.linspace(10, 50, 10)
+        xs, ys = self.interpolate(df, array)
+        self.assertListEqual(expected_xs, xs)
+        self.assertListEqual(expected_ys, ys)
+
+    def tearDown(self):
+        """ Run post each test."""
         pass
 
 
@@ -179,13 +203,14 @@ class FieldTests(unittest.TestCase):
 
     def test_get_corners(self):
         """ Test it correctly finds the corners of the sobel image """
+
         expected = [(10,90), (90,10), (10,10), (90,90)]
-        #corners = self.sobel_profile.get_corners()
-        #self.assertListEqual(expected, corners)
+        corners = self.sobel_profile.get_corners()
+        self.assertListEqual(expected, corners)
         # doesn't work because it gets filtered and it doesn't have any peaks
         # get corners uses filtering, peakdetect and line intersection
         # could input an image with known corners?
-        # is this indpendent?
+        # is this independent?
 
     def test_field_size(self):
         """ Test the field size of the EPID and the water phantom are equal """
@@ -193,6 +218,8 @@ class FieldTests(unittest.TestCase):
          _10x_inline, _10x_crossline,
          _10fff_inline, _10fff_crossline] = SNC.read_dose_tables() # this is the calibration one?
         # don't we want to do this for new images?
+        # so how to do this?
+        # field size is x distance where f''=0, at 50% of height
 
     def tearDown(self):
         """Run post each test."""

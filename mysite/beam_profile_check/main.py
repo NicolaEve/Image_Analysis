@@ -18,7 +18,7 @@ from .peakdetect import peakdetect
 from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
 
-# static functions
+
 def normalise(x_array, y_array):
     """ Normalise the array by setting f(0)=1 i.e. dividing all values by the value at f(0)"""
 
@@ -31,7 +31,19 @@ def normalise(x_array, y_array):
 
     return normalised_array
 
-# define functions
+
+def interpolate(df, profile):
+    """ Interpolate the dataframe (x,y) to the number of points in the profile """
+    xs = df[0]
+    ys = df[1]
+    number_points = len(profile)
+
+    new_xs = np.linspace(min(xs), max(xs), number_points)
+    new_ys = interp1d(xs, ys)(new_xs)
+
+    return new_xs, new_ys
+
+
 class Image:
 
     def __init__(self, filename):
@@ -273,22 +285,11 @@ class Transform:
         self.profile_list = profile_list
         self.centre = centre
 
-    def interpolate(self, df, profile):
-        """ Interpolate the dataframe (x,y) to the number of points in the profile """
-        xs = df[0]
-        ys = df[1]
-        number_points = len(profile)
-
-        new_xs = np.linspace(min(xs), max(xs), number_points)
-        new_ys = interp1d(xs, ys)(new_xs)
-
-        return new_xs, new_ys
-
     def field_size(self, df, profile):
         """ Calculate field size as distance between inflection points """
 
         # first interpolate and normalise the df - inline/crossline
-        xs, ys = self.interpolate(df, profile)
+        xs, ys = interpolate(df, profile)
         normalised_ys = normalise(xs, ys)
 
         # find the two values where the normalised y = 0.5
@@ -321,7 +322,7 @@ class Transform:
             profile = self.profile_list[1]
             title = "Crossline"
 
-        new_xs, new_ys = self.interpolate(df, profile)
+        new_xs, new_ys = interpolate(df, profile)
         x_axis = new_xs
         y_axis = normalise(new_xs, new_ys)
         norm_profile = normalise(new_xs, profile)
@@ -352,12 +353,12 @@ class Transform:
 
         # get the normalised profiles and doses
         # inline
-        new_xs, new_ys = self.interpolate(inline_df, profile_x)
+        new_xs, new_ys = interpolate(inline_df, profile_x)
         inline_dose = normalise(new_xs, new_ys)
         norm_profile_x = normalise(new_xs, profile_x)
 
         # crossline
-        new_xs, new_ys = self.interpolate(crossline_df, profile_y)
+        new_xs, new_ys = interpolate(crossline_df, profile_y)
         crossline_dose = normalise(new_xs, new_ys)
         norm_profile_y = normalise(new_xs, profile_y)
 
