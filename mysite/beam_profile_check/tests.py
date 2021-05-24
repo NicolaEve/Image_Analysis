@@ -1,8 +1,20 @@
-from django.test import TestCase
+"""
+This script tests the functionality of the app
+To run, cd into mysite and type 'nose2 -v' to the command line
+A coverage report can be generated using nose2 --with-coverage   -vvv
+
+Author: Nicola Compton
+Date: 24th May 2021
+Contact: nicola.compton@ulh.nhs.uk
+"""
+
+
 from django.test import TestCase
 
 import unittest
-from main import Image, Edges, Profiles, Transform, SNC
+from .main import Image, Edges, Profiles, Transform
+from .run_calibration import SNC
+from .models import TransformView
 import numpy as np
 import matplotlib
 from matplotlib import testing
@@ -12,36 +24,36 @@ import pytest
 import cv2
 import os
 import pandas as pd
-from peakdetect import peakdetect
+from .peakdetect import peakdetect
 from numpy import diff
 
-dir=os.getcwd()
+# directory where test images are stored
+image_test_dir = os.path.join(os.getcwd(), "Images_for_tests")
 
 # import test images
-file_colour=os.path.join(dir, "Test_image_colour.png")
-file_sobel=os.path.join(dir, "test_image_sobel.png")
+file_colour = os.path.join(image_test_dir, "Test_image_colour.png")
+file_sobel = os.path.join(image_test_dir, "test_image_sobel.png")
+
 
 class ImageTests(unittest.TestCase):
     """ Class to test the functionality of the image processing functions """
 
     def setUp(self):
         """Run prior to each test."""
-        self.colour=Image(file_colour)
-        self.sobel=Image(file_sobel)
-
+        self.colour = Image(file_colour)
+        self.sobel = Image(file_sobel)
 
     def test_sobel_equal(self):
         """Test that the Sobel edge detection function returns edges"""
         # save image as a .png so it can be tested using matplotlib compare
-        out_img=Edges.sobel_edges(self.colour)
+        out_img = Edges.sobel_edges(self.colour)
         global out_file
-        out_file=os.path.join(dir, "output_image.png")
+        out_file = os.path.join(image_test_dir, "output_image.png")
         cv2.imwrite(out_file, out_img)
         # test that they are equal, tolerance is 40 - bit iffy
-        out=matplotlib.testing.compare.compare_images(out_file, file_sobel, 40, in_decorator=True)
+        out = matplotlib.testing.compare.compare_images(out_file, file_sobel, 40, in_decorator=True)
         if str(out) != 'None':
             raise Exception('Edge detection using Sobel operator failed')
-
 
     def test_sobel_unequal(self):
         """Test the images are not equal"""
@@ -49,7 +61,6 @@ class ImageTests(unittest.TestCase):
         if str(out) == 'None':
             raise Exception('Sobel operator has not altered the image')
         # should compare_images raise the exception?
-
 
     def tearDown(self):
         """Run post each test."""
@@ -89,13 +100,6 @@ class ProfileTests(unittest.TestCase):
         np.testing.assert_array_equal(x_profile, np.array([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]))
         np.testing.assert_array_equal(y_profile, np.array([[2, 2, 2]]))
 
-
-    def test_line_midpoint(self):
-        """ Test the midpoint functions returns the midpoint of the line """
-        x, y = self.profile.line_midpoint((10, 10), (0, 0))
-        self.assertEqual(x, 5)
-        self.assertEqual(y, 5)
-
     def tearDown(self):
         """Run post each test."""
         pass
@@ -116,7 +120,7 @@ class TransformTests(unittest.TestCase):
         profile_list = [[1,1,1,1,1], [1,1,1,1,1]]
         centre = 2, 2
 
-        self.transform = Transform(df_list, profile_list, image, centre)
+        self.transform = Transform(df_list, profile_list, centre)
 
     def test_normalise(self):
         """ Test the normalising function """
@@ -137,6 +141,7 @@ class TransformTests(unittest.TestCase):
     def tearDown(self):
         """Run post each test."""
         pass
+
 
 class FieldTests(unittest.TestCase):
     """ Check field size calculated correctly and matches """
@@ -186,15 +191,12 @@ class FieldTests(unittest.TestCase):
         """ Test the field size of the EPID and the water phantom are equal """
         [_6x_inline, _6x_crossline,
          _10x_inline, _10x_crossline,
-         _10fff_inline, _10fff_crossline] = SNC.read_dose_tables()
-
-
-
+         _10fff_inline, _10fff_crossline] = SNC.read_dose_tables() # this is the calibration one?
+        # don't we want to do this for new images?
 
     def tearDown(self):
         """Run post each test."""
         pass
-
 
 
 if __name__ == "__main__":

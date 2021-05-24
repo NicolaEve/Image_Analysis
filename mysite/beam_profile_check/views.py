@@ -1,7 +1,11 @@
-from django.shortcuts import render
-from django.shortcuts import render
+"""
+Views processes user response and makes new displays to the user i.e. plots
 
-# Create your views here.
+Author: Nicola Compton
+Date: 24th May 2021
+Contact: nicola.compton@ulh.nhs.uk
+"""
+
 from django.http import HttpResponse
 from django.shortcuts import render, redirect
 from .forms import *
@@ -12,16 +16,12 @@ from django.views.generic import ListView
 from .run_calibration import *
 from .main import *
 import os
-import glob
 import datetime as dt
 import shutil
-from plotly.subplots import make_subplots
-import plotly.graph_objects as go
 
-# this must macth the media url in mysite/settings file
-# import mysite_root.mysite.settings could not find module
-#media_directory = r"C:\Users\NCompton\PycharmProjects\ImageAnalysis\mysite_root\media\images"
-media_directory = r"C:\Users\NCompton\PycharmProjects\ImageAnalysis_venv\env\Scripts\ImageAnalysis\mysite_root\media\images"
+# set the directory where uploaded images are saved to
+media_directory = os.path.join(os.getcwd(), "media\images")
+
 
 class Index(ListView):
     template_name = 'templates/index.html'

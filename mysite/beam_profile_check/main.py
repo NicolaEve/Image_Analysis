@@ -8,14 +8,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 from .peakdetect import peakdetect
-import scipy
-from scipy import interpolate
 from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
 import pandas as pd
 import os
-from numpy import diff
-from scipy.misc import derivative
 
 # define functions
 class Image:
@@ -38,6 +34,7 @@ class Image:
         unnoisy_img = cv2.GaussianBlur(self.gray(), (3, 3), 0)
         return unnoisy_img
 
+
 class Edges(Image):
 
     def __init__(self):
@@ -55,71 +52,6 @@ class Edges(Image):
         mag *= 255.0 / np.max(mag)  # normalise
         return mag
 
-class SNC:
-
-    """ Class for dealing with files exported from SNC i.e. water phantom"""
-
-    def __init__(self):
-        """ Define folder in which the SNC text files are stored"""
-        pass
-
-    def read_dose_tables():
-        """Read the dose tables from the MPC snctxt files stored in Images\Tables"""
-
-        # declare variables
-        _6x_inline  = []
-        _6x_crossline = []
-        _10x_inline = []
-        _10x_crossline =[]
-        _10fff_inline =[]
-        _10fff_crossline =[]
-
-        # loop through directory
-        #directory = os.path.join(os.getcwd(), "Images\Tables")
-        directory = r"C:\Users\NCompton\PycharmProjects\ImageAnalysis\Images\Tables"
-
-        for file in os.listdir(directory):
-            if file.endswith('snctxt'):
-
-                # read the file into a pandas dataframe
-                filename = os.path.join(directory, file)
-                df = pd.read_table(filename, header=0, names=['X (cm)', 'Y (cm)', 'Z (cm)', 'Relative Dose (%)'])
-
-                # determine if it's inline or crossline
-                # set inline to binary, 0 for false
-                inline = 0
-                if filename.find("inline") != -1:
-                    # inline uses y measurements
-                    data = [df['Y (cm)'], df['Relative Dose (%)']]
-                    inline=1 # 1 for true
-                if filename.find("crossline") != -1:
-                    # crossline uses x measurements
-                    data = [df['X (cm)'], df['Relative Dose (%)']]
-
-                # determine the beam energy
-                if filename.find("10fff") != -1:
-                    if inline==1:
-                        _10fff_inline = data
-                    else:
-                        _10fff_crossline = data
-
-                if filename.find("10x") != -1:
-                    if inline==1:
-                        _10x_inline = data
-                    else:
-                        _10x_crossline = data
-
-                if filename.find("6x") != -1:
-                    if inline==1:
-                        _6x_inline = data
-                    else:
-                        _6x_crossline = data
-
-        dataset = [_6x_inline, _6x_crossline,
-                    _10x_inline, _10x_crossline,
-                    _10fff_inline, _10fff_crossline]
-
-        return dataset
 
 
 class Profiles:
@@ -456,8 +388,6 @@ class Transform:
                 if n != x and m != y:
                     dose_matrix[n, m] = dose_matrix[n][y] * dose_matrix[x][m]
 
-        #plt.imshow(dose_matrix)
-        #plt.show()
 
         return dose_matrix
 

@@ -1,4 +1,13 @@
-from django.db import models
+"""
+Models defines the database objects for the app.
+
+This script also contains code for symmetry and flatness metrics.
+
+Author: Nicola Compton
+Date: 24th May 2021
+Contact: nicola.compton@ulh.nhs.uk
+"""
+
 from django.db import models
 from django import forms
 from . import run_calibration
@@ -6,9 +15,11 @@ from .main import Edges, Image, Profiles
 import numpy as np
 
 #class Index(models.Model):
+# need to make a model for the index page to avoid query improperly configured error
 
 
 class BeamEnergy6x(models.Model):
+    """ Class to process 6x file upload """
     image = models.FileField(upload_to='images/')
     title = models.CharField(max_length=200)
 
@@ -20,6 +31,7 @@ class BeamEnergy6x(models.Model):
 
 
 class BeamEnergy10x(models.Model):
+    """ Class to process 10x file upload """
     image = models.FileField(upload_to='images/')
     title = models.CharField(max_length=200)
 
@@ -31,6 +43,7 @@ class BeamEnergy10x(models.Model):
 
 
 class BeamEnergy10fff(models.Model):
+    """ Class to process 10fff file upload """
     image = models.FileField(upload_to='images/')
     title = models.CharField(max_length=200)
 
@@ -46,12 +59,13 @@ class TransformView(models.Model):
     """class to apply the transformation matrices onto new images """
 
     def __init__(self, energy, filename):
-        """ energy is which beam we are tranforming, 6x, 10x, or 10xfff,
-         filename is the new image """
+        """ energy is which beam we are transforming, 6x, 10x, or 10xfff,
+         filename is the newly uploaded image """
         self.energy = energy
         self.filename = filename
 
     def get_matrix(self):
+        """ Extract the calibration matrix for the corresponding beam energy """
         if self.energy == "6x":
             matrix = run_calibration._6x_matrix
         if self.energy == "10x":
@@ -62,6 +76,7 @@ class TransformView(models.Model):
         return matrix
 
     def get_original_centre(self):
+        """ Find centre of field in calibration image """
         if self.energy == "6x":
             centre = run_calibration._6x_sobel.get_centre()
         if self.energy == "10x":
@@ -84,10 +99,10 @@ class TransformView(models.Model):
         return x_array, normalised_array
 
     def process_profile(self, profile, centre_cood):
-        """ enter the x or y profile and the corresponding x/y central co-ordinate,
-        return the shifted (w.r.t. centre) and normalised arrays, converted to distance """
+        """ Input: profile = x or y profile; centre_cood = corresponding x or y central co-ordinate
+            Output: the shifted (w.r.t. centre) and normalised arrays, measured in distance """
 
-        # shift it to be centred at 0 and convert to cm
+        # shift it to be centred at 0 and convert to cm, using MPC EPID resolution
         xs = np.linspace(0, len(profile), len(profile))
         shifted_xs = [(x - int(centre_cood)) * 0.0336 for x in xs]
         # normalise profile
@@ -137,28 +152,23 @@ class TransformView(models.Model):
         index_centre = index - index_lwr
 
         # find the max difference for symmetric pairs
-        #diff = []
         symm =[]
         for i in range(int(len(field_80)*0.5)):
             right = index_centre + i
             left = index_centre - i
-            #percentage_diff = 100 * ((field_80[right] - field_80[left]) / (0.5 * (field_80[right] + field_80[left])))
             cpd_percentage = 100 * (np.abs((field_80[right] - field_80[left])) / field_80[index_centre])
             symm.append(cpd_percentage)
-            #diff.append(percentage_diff)
-        #symmetry = np.abs(max(diff))
+
         symmetry = max(symm)
 
         return symmetry
 
 
     def flattness(self, x_array, transformed_profile):
-        """ Find the flattness of the field, in the middle 80% """
+        """ Find the flatness of the field, in the middle 80% """
 
         # find percentage difference of the values in the middle 80%
         field_80, lrw = self.core_80(x_array, transformed_profile)
-        #flattness = 100 * ((max(field_80) - min(field_80)) / ((max(field_80) + min(field_80)) * 0.5))
-        #flatness = max(field_80) / min(field_80)
         # flatness is max absolute deviation from mean, expressed as percentage
         flat = []
         for x in field_80:
@@ -169,8 +179,12 @@ class TransformView(models.Model):
         return flatness
 
     def transform(self):
+        """ Apply the calibration to the new image and return the transformed matrix,
+         flatness and symmetry """
 
         # apply transformation matrix and plot
+
+        # get central profiles of newly uploaded image
         img0 = Image(self.filename)
         image_sobel = Edges.sobel_edges(img0)
         # find centre
@@ -183,7 +197,7 @@ class TransformView(models.Model):
         x_array_x, normalised_array_x = self.process_profile(profile_x[0], new_centre[0])
         x_array_y, normalised_array_y = self.process_profile(profile_y[0], new_centre[1])
 
-        # get transformation matrix
+        # get calibration matrix
         transformation = self.get_matrix()
         # get centre of field matrix
         matrix_centre = self.get_original_centre()
