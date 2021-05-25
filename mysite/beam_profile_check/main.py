@@ -18,7 +18,6 @@ from .peakdetect import peakdetect
 from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
 from . import run_calibration
-#import run_calibration
 
 def normalise(x_array, y_array):
     """ Normalise the array by setting f(0)=1 i.e. dividing all values by the value at f(0)"""
@@ -386,6 +385,7 @@ class Transform:
                     dose_matrix[n, m] = dose_matrix[n][y] * dose_matrix[x][m]
 
         return dose_matrix
+
 
 class TransformView:
     """class to apply the transformation matrices onto new images """

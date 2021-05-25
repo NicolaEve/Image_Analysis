@@ -11,24 +11,17 @@ import os
 import shutil
 import datetime
 from datetime import datetime
-import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 # define the directories
 media_directory = r"C:\Users\NCompton\PycharmProjects\ImageAnalysis_venv_2\mysite\media\images"
 xim_directory = os.path.join(media_directory, "XIMdata")
 dir = r"Y:\TDS\H192138\MPCChecks"
 
-# set up empty pandas dataframes for each energy
-dtypes = np.dtype([
-          ('x', str),
-          ('y', int),
-          ('symmetry', float),
-          ('d', np.datetime64),
-          ])
-data = np.empty(0, dtype=dtypes)
-df_6x_inline = pd.DataFrame(data)
-df_6x_crossline = pd.DataFrame(data)
+# set up empty lists for each energy
+df_6x_inline = []
+df_6x_crossline = []
 
 for folder in os.listdir(dir):
     path = os.path.join(dir, folder)
@@ -57,11 +50,23 @@ for folder in os.listdir(dir):
                     if new_file.endswith(".png") or new_file.endswith(".jpeg"):
                         image_file = os.path.join(xim_directory, new_file)
                 # apply the transformation matrix for the beam energy
+                # this could need changing to include taking the average of +/-10 pixel rows
+                # average from the profiles adjacent to centre
+                # but is that assuming the adajcent 10 are the centre and then applying calibration
+                # or applying the transformation matrix and then taking avergae?
                 inline, crossline = main.TransformView("6x", image_file).transform()
+                inline.append(date)
+                crossline.append(date)
 
-                # structure of inline and crossline = [x, y, symmetry, flatness]
-                # store that in a dataframe with the date and beam energy
-                df_6x_inline
+
+                # structure of inline and crossline = [x, y, symmetry, flatness, date]
+                # structure of dataframe: df[row][column]
+                # plot df[i][0], df[i][1] to see dose profile
+                # and print df[i][2] for symmetry, df[i][3] flatness, df[i][4] date
+                # update the dataframes
+                df_6x_inline.append(inline)
+                df_6x_crossline.append(crossline)
+
                 # compare to the MPC results
 
     if filename.find("10x") != -1:
