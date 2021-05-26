@@ -19,6 +19,7 @@ from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
 from . import run_calibration
 
+
 def normalise(x_array, y_array):
     """ Normalise the array by setting f(0)=1 i.e. dividing all values by the value at f(0)"""
 
@@ -42,6 +43,76 @@ def interpolate(df, profile):
     new_ys = interp1d(xs, ys)(new_xs)
 
     return new_xs, new_ys
+
+
+def core_80(x_array, profile):
+    """ Get the central 80% of the field """
+    # field width is at 50% of the max
+    # middle 80% is 80% of this width (x axis)
+
+    # find closest x values to 0.5 * max in the profile
+    value = 0.5 * max(profile)
+    half = int(len(profile) * 0.5)
+    first_half = np.asarray(profile[0:half])
+    index_1 = (np.abs(first_half - value)).argmin()
+    second_half = np.asarray(profile[half:-1])
+    index_2 = (np.abs(second_half - value)).argmin() + half
+
+    # so we can define field width
+    field_width = x_array[index_2] - x_array[index_1]
+
+    # find the middle 80% of the field, in relation to the x axis index
+    # values on x axis at 80% boundaries
+    lwr = int((0.1 * field_width) + x_array[index_1])
+    uppr = int(x_array[index_2] - (0.1 * field_width))
+
+    # find the index in the original array closest to the upper and lower values,
+    # which define the middle 80% of the field
+    x_array = np.asarray(x_array)
+    index_lwr = (np.abs(x_array - lwr)).argmin()
+    index_uppr = (np.abs(x_array - uppr)).argmin()
+
+    field_80 = profile[index_lwr:index_uppr]
+
+    return field_80, index_lwr
+
+
+def symmetry(x_array, transformed_profile):
+    """ Find the symmetry """
+    # middle 80% of field
+    field_80, index_lwr = core_80(x_array, transformed_profile)
+    # we shifted to 0 by -centre so 0 is centre
+    x_array = np.asarray(x_array)
+    index = (np.abs(x_array - 0)).argmin()
+    # find corresponding index in field_80
+    index_centre = index - index_lwr
+
+    # find the max difference for symmetric pairs
+    symm =[]
+    for i in range(int(len(field_80)*0.5)):
+        right = index_centre + i
+        left = index_centre - i
+        cpd_percentage = 100 * (np.abs((field_80[right] - field_80[left])) / field_80[index_centre])
+        symm.append(cpd_percentage)
+
+    symmetry = max(symm)
+
+    return symmetry
+
+
+def flatness(x_array, transformed_profile):
+    """ Find the flatness of the field, in the middle 80% """
+
+    # find percentage difference of the values in the middle 80%
+    field_80, lrw = core_80(x_array, transformed_profile)
+    # flatness is max absolute deviation from mean, expressed as percentage
+    flat = []
+    for x in field_80:
+        diff = np.abs(x - np.mean(field_80))
+        perc = 100 * (diff / np.mean(field_80))
+        flat.append(perc)
+    flatness = max(flat)
+    return flatness
 
 
 class Image:
@@ -102,6 +173,16 @@ class Profiles:
         filtered_x = [savgol_filter(profile, 43, 3) for profile in profile_x]
         filtered_y = [savgol_filter(profile, 43, 3) for profile in profile_y]
         return filtered_x, filtered_y
+
+    def get_average_profile(self):
+        """ Take the average profile from -/+ 10 about profile given """
+        profile_x=[]
+        profile_y=[]
+        for offset in np.linspace(-10,10,21):
+            profile_x.append([self.image[i+offset, :] for i in self.x_axis])
+            profile_y.append([self.image[:, j+offset] for j in self.y_axis])
+        return np.mean(profile_x), np.mean(profile_y)
+
 
     def get_max_peaks(self, array_list):
         """ Find the peaks of profiles in array_list using peakdetect.py
@@ -421,6 +502,7 @@ class TransformView:
     def process_profile(self, profile, centre_cood):
         """ Input: profile = x or y profile; centre_cood = corresponding x or y central co-ordinate
             Output: the shifted (w.r.t. centre) and normalised arrays, measured in distance """
+        # this just puts the plot symmetric about 0 and normalised and in distance
 
         # shift it to be centred at 0 and convert to cm, using MPC EPID resolution
         xs = np.linspace(0, len(profile), len(profile))
@@ -429,73 +511,6 @@ class TransformView:
         normalised_array= normalise(shifted_xs, profile)
 
         return shifted_xs, normalised_array
-
-    def core_80(self, x_array, profile):
-        """ Get the central 80% of the field """
-        # field width is at 50% of the max
-        # middle 80% is 80% of this width (x axis)
-
-        # find closest x values to 0.5 * max in the profile
-        value = 0.5 * max(profile)
-        half = int(len(profile) * 0.5)
-        first_half = np.asarray(profile[0:half])
-        index_1 = (np.abs(first_half - value)).argmin()
-        second_half = np.asarray(profile[half:-1])
-        index_2 = (np.abs(second_half - value)).argmin() + half
-
-        # so we can define field width
-        field_width = x_array[index_2] - x_array[index_1]
-
-        # find the middle 80% of the field, in relation to the x axis index
-        # values on x axis at 80% boundaries
-        lwr = int((0.1 * field_width) + x_array[index_1])
-        uppr = int(x_array[index_2] - (0.1 * field_width))
-
-        # find the index in the original array closest to the upper and lower values,
-        # which define the middle 80% of the field
-        x_array = np.asarray(x_array)
-        index_lwr = (np.abs(x_array - lwr)).argmin()
-        index_uppr = (np.abs(x_array - uppr)).argmin()
-
-        field_80 = profile[index_lwr:index_uppr]
-
-        return field_80, index_lwr
-
-    def symmetry(self, x_array, transformed_profile):
-        """ Find the symmetry """
-        # middle 80% of field
-        field_80, index_lwr = self.core_80(x_array, transformed_profile)
-        # we shifted to 0 by -centre so 0 is centre
-        x_array = np.asarray(x_array)
-        index = (np.abs(x_array - 0)).argmin()
-        # find corresponding index in field_80
-        index_centre = index - index_lwr
-
-        # find the max difference for symmetric pairs
-        symm =[]
-        for i in range(int(len(field_80)*0.5)):
-            right = index_centre + i
-            left = index_centre - i
-            cpd_percentage = 100 * (np.abs((field_80[right] - field_80[left])) / field_80[index_centre])
-            symm.append(cpd_percentage)
-
-        symmetry = max(symm)
-
-        return symmetry
-
-    def flatness(self, x_array, transformed_profile):
-        """ Find the flatness of the field, in the middle 80% """
-
-        # find percentage difference of the values in the middle 80%
-        field_80, lrw = self.core_80(x_array, transformed_profile)
-        # flatness is max absolute deviation from mean, expressed as percentage
-        flat = []
-        for x in field_80:
-            diff = np.abs(x - np.mean(field_80))
-            perc = 100 * (diff / np.mean(field_80))
-            flat.append(perc)
-        flatness = max(flat)
-        return flatness
 
     def transform(self):
         """ Apply the calibration to the new image and return the transformed matrix,
@@ -526,15 +541,16 @@ class TransformView:
         transformed_profile_x = []
         for x in range(len(normalised_array_x)):
             transformed_profile_x.append(normalised_array_x[x] * transformation[int(matrix_centre[0])][x])
+
         transformed_profile_y = []
         for x in range(len(normalised_array_y)):
             transformed_profile_y.append(normalised_array_y[x] * transformation[x][int(matrix_centre[1])])
 
-        symmetry_x = self.symmetry(x_array_x, transformed_profile_x)
-        symmetry_y = self.symmetry(x_array_y, transformed_profile_y)
+        symmetry_x = symmetry(x_array_x, transformed_profile_x)
+        symmetry_y = symmetry(x_array_y, transformed_profile_y)
 
-        flatness_x = self.flatness(x_array_x, transformed_profile_x)
-        flatness_y = self.flatness(x_array_y, transformed_profile_y)
+        flatness_x = flatness(x_array_x, transformed_profile_x)
+        flatness_y = flatness(x_array_y, transformed_profile_y)
 
         return [x_array_x, transformed_profile_x, symmetry_x, flatness_x], \
                [x_array_y, transformed_profile_y, symmetry_y, flatness_y]

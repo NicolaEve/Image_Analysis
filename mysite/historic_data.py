@@ -6,7 +6,6 @@ The reason it will only run locally is that Aria image is password protected """
 
 # import modules
 from beam_profile_check import run_calibration, main
-#from main import *
 import os
 import shutil
 import datetime
@@ -21,22 +20,37 @@ media_directory = r"C:\Users\NCompton\PycharmProjects\ImageAnalysis_venv_2\mysit
 xim_directory = os.path.join(media_directory, "XIMdata")
 dir = r"Y:\TDS\H192138\MPCChecks"
 
-# these store results from the MPC
-beam_output_change = []
-beam_uniformity_change = []
-beam_centre_shift = []
+# set up connection to the MPC database
+cnxn_str = ("Driver={SQL Server Native Client 11.0};"
+            "Server=IT049561\SQLEXPRESS;"
+            "Database=MPC;"
+            "Trusted_Connection=yes;")
+dbo = pyodbc.connect(cnxn_str)
+cursor = dbo.cursor()
 
 for folder in os.listdir(dir):
     path = os.path.join(dir, folder)
     filename = str(path)
-    if filename.find("6x") != -1:
-
-        # get the creation date of the file
-        created = os.stat(path).st_ctime
-        date = datetime.fromtimestamp(created)
+    if filename.find("6x-") != -1:
 
         # get the beam profile check data
+        i = 0
         for file in os.listdir(path):
+            if i == 0:
+                # get the creation date of the first file in the folder
+                first_path = os.path.join(path, file)
+                created = os.stat(first_path).st_ctime
+                date = datetime.fromtimestamp(created)
+
+                # enter date and beam energy to database
+                # return the mpc event id
+                statement = """declare @mpc_event_id int;
+                                    EXEC @mpc_event_id = Insert_MPC_Event ?,?;
+                                    SELECT @mpc_event_id as mpc_event_id; """
+                cursor.execute(statement, ["6x", date])
+                mpc_event_id = cursor.fetchval()
+                cursor.commit()
+                i = 1
             if str(file) == "BeamProfileCheck.xim":
                 xim_file = os.path.join(path, file)
                 # extract the data
@@ -53,18 +67,43 @@ for folder in os.listdir(dir):
                     if new_file.endswith(".png") or new_file.endswith(".jpeg"):
                         image_file = os.path.join(xim_directory, new_file)
                 # apply the transformation matrix for the beam energy
-                # this could need changing to include taking the average of +/-10 pixel rows
+                # this needs changing to include taking the average of +/-10 pixel rows
                 # average from the profiles adjacent to centre
                 # but is that assuming the adajcent 10 are the centre and then applying calibration
                 # or applying the transformation matrix and then taking avergae?
                 inline, crossline = main.TransformView("6x", image_file).transform()
-                inline.append(date)
-                crossline.append(date)
-
-
                 # structure of inline and crossline = [x, y, symmetry, flatness, date]
-                # add new data into the database
-                pyodbc
+
+                # enter date and beam energy to database
+                # 1 for inline
+                # 1 for transformed
+                # get the mapping id
+                statement = """declare @mapping_id int;
+                                    EXEC @mapping_id = Insert_Symm_Flat_Data ?,?,?,?,?;
+                                    SELECT @mapping_id as mapping_id; """
+                cursor.execute(statement, [mpc_event_id, 1, 1, inline[2], inline[3]])
+                mapping_id = cursor.fetchval()
+                cursor.commit()
+
+                # add raw data into the database
+                for i in range(len(inline[0])):
+                    x = inline[0][i]
+                    y = inline[1][i]
+                    cursor.execute("EXEC Insert_Raw_Values ?,?,?", [mapping_id, x, y])
+                    cursor.commit()
+
+                # repeat for crossline
+                statement = """declare @mapping_id int;
+                                EXEC @mapping_id = Insert_Symm_Flat_Data ?,?,?,?,?;
+                                SELECT @mapping_id as mapping_id; """
+                cursor.execute(statement, [mpc_event_id, 0, 1, crossline[2], crossline[3]])
+                mapping_id = cursor.fetchval()
+                cursor.commit()
+                for i in range(len(crossline[0])):
+                    x = crossline[0][i]
+                    y = crossline[1][i]
+                    cursor.execute("EXEC Insert_Raw_Values ?,?,?", [mapping_id, x, y])
+                    cursor.commit()
 
                 # compare to the MPC results
                 # get symmetry and flatness from the raw data for comparison
@@ -78,42 +117,21 @@ for folder in os.listdir(dir):
                 for line in csv_reader_object:
                     name = str(line[0])
                     if name.find("BeamOutputChange") != -1:
-                        beam_output_change.append([line, date])
+                        # test_id = 1
+                        cursor.execute("EXEC Insert_MPC_Results ?,?,?", [mpc_event_id, 1, line[1]])
                     if name.find("BeamUniformityChange") != -1:
-                        beam_uniformity_change.append([line, date])
+                        cursor.execute("EXEC Insert_MPC_Results ?,?,?", [mpc_event_id, 2, line[1]])
+                        # test id = 2
                     if name.find("BeamCenterShift") != -1:
-                        beam_centre_shift.append([line, date])
-
+                        cursor.execute("EXEC Insert_MPC_Results ?,?,?", [mpc_event_id, 3, line[1]])
+                        # test id = 3
+                    cursor.commit()
 
                 # put that all in a database, so then can put into a spreadsheet
                 # spc on the mpc results
 
-    if filename.find("10x") != -1:
-        if filename.find("10xFFF") != -1:
-            for files in os.listdir(path):
-                if str(files).find("BeamProfileCheck") != -1:
-                    image_file = os.path.join(path, files)
-                    #new_name = os.path.join(media_directory, str("10xfff_" + str(it_10fff) + ".xim"))
-                    #shutil.copy(image_file, new_name)
-                    #it_10fff = it_10fff + 1
 
-        else:
-            for files in os.listdir(path):
-                if str(files).find("BeamProfileCheck") != -1:
-                    image_file = os.path.join(path, files)
-                    #new_name = os.path.join(media_directory, str("10x_" + str(it_10x) + ".xim"))
-                    #shutil.copy(image_file, new_name)
-                    #it_10x = it_10x + 1
+# repeat for 10x and 10fff
 
-# look for the folders with 10x, 10xFFF and 6x
-# inside these search for BeamProfileCheck.xim
-# copy files into media folder, rename to match the beam energy?
-
-# apply what is done above:
-# convert xim to png
-# sobel image > find centre > filter profiles > normalise
-# > apply transformation matrix > convert to distance > plot
-# display symmetry
-
-# what if ariaimage is password protected? it won't pull from a server level
-# batch file to copy and put in credenitals -> security, can't be open source
+  #  if filename.find("10x-") != -1:
+     #   if filename.find("10xFFF-") != -1:
