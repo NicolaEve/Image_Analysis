@@ -13,22 +13,25 @@ import datetime
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
+import csv
+import pyodbc
 
 # define the directories
 media_directory = r"C:\Users\NCompton\PycharmProjects\ImageAnalysis_venv_2\mysite\media\images"
 xim_directory = os.path.join(media_directory, "XIMdata")
 dir = r"Y:\TDS\H192138\MPCChecks"
 
-# set up empty lists for each energy
-df_6x_inline = []
-df_6x_crossline = []
+# these store results from the MPC
+beam_output_change = []
+beam_uniformity_change = []
+beam_centre_shift = []
 
 for folder in os.listdir(dir):
     path = os.path.join(dir, folder)
     filename = str(path)
     if filename.find("6x") != -1:
 
-        # get the creation dat of the file
+        # get the creation date of the file
         created = os.stat(path).st_ctime
         date = datetime.fromtimestamp(created)
 
@@ -60,14 +63,30 @@ for folder in os.listdir(dir):
 
 
                 # structure of inline and crossline = [x, y, symmetry, flatness, date]
-                # structure of dataframe: df[row][column]
-                # plot df[i][0], df[i][1] to see dose profile
-                # and print df[i][2] for symmetry, df[i][3] flatness, df[i][4] date
-                # update the dataframes
-                df_6x_inline.append(inline)
-                df_6x_crossline.append(crossline)
+                # add new data into the database
+                pyodbc
 
                 # compare to the MPC results
+                # get symmetry and flatness from the raw data for comparison
+                # extract the reported results in the excel file
+            if str(file) == "Results.csv":
+                results_file = os.path.join(path, file)
+                f = open(results_file)
+                csv_reader_object = csv.reader(f)
+
+                # structure of these is [name, value, threshold, pass/fail, date]
+                for line in csv_reader_object:
+                    name = str(line[0])
+                    if name.find("BeamOutputChange") != -1:
+                        beam_output_change.append([line, date])
+                    if name.find("BeamUniformityChange") != -1:
+                        beam_uniformity_change.append([line, date])
+                    if name.find("BeamCenterShift") != -1:
+                        beam_centre_shift.append([line, date])
+
+
+                # put that all in a database, so then can put into a spreadsheet
+                # spc on the mpc results
 
     if filename.find("10x") != -1:
         if filename.find("10xFFF") != -1:
