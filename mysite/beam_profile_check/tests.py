@@ -12,9 +12,7 @@ Contact: nicola.compton@ulh.nhs.uk
 from django.test import TestCase
 
 import unittest
-from .main import Image, Edges, Profiles, Transform, normalise, interpolate
-from .run_calibration import SNC
-#from .models import TransformView
+from .main import *
 import numpy as np
 import matplotlib
 from matplotlib import testing
@@ -144,6 +142,7 @@ class StaticTests(unittest.TestCase):
         """ Run prior to each test."""
         self.normalise = normalise
         self.interpolate = interpolate
+        self.core_80 = core_80
 
     def test_normalise(self):
         """ Test the normalising function """
@@ -161,8 +160,20 @@ class StaticTests(unittest.TestCase):
         np.testing.assert_allclose(expected_xs, xs)
         np.testing.assert_allclose(expected_ys, ys)
 
+    def test_core_80(self):
+        """ Test the function which returns the central 80% of the field """
+        x_array = np.linspace(-10, 10, 100)
+        profile = x_array**2
+        exp_80 = profile[20:80]
+        out_80, lwr_index = self.core_80(x_array, profile)
+        self.assertEqual(lwr_index, 20)
+        np.testing.assert_array_equal(exp_80, out_80)
+
     def tearDown(self):
         """ Run post each test."""
+        pass
+
+    def core_80(self, x_array, profile):
         pass
 
 
