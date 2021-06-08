@@ -314,6 +314,11 @@ class Calibrate:
 
         return _6x_mpc, _10x_mpc, _10fff_mpc
 
+    def centre_6x(self):
+        """ return the centre of the original 6x mpc epid image """
+        _6x_mpc, _10x_mpc, _10fff_mpc = self.mpc_data()
+        return _6x_mpc[2]
+
     def matrix(self, snc, mpc):
         """ Construct the matrix of dose ratios """
         # input: snc: a dataframe of inline and crossline dose from the water tank
@@ -379,17 +384,17 @@ class Calibrate:
 
         return _6x_cal_matrix, _10x_cal_matrix, _10fff_cal_matrix
 
-    def _6x(self):
+    def energy_6x(self):
         """ Return _6x calibration matrix """
         _6x_cal_matrix, _10x_cal_matrix, _10fff_cal_matrix = self.get_matrices()
         return _6x_cal_matrix
 
-    def _10x(self):
+    def energy_10x(self):
         """ Return _6x calibration matrix """
         _6x_cal_matrix, _10x_cal_matrix, _10fff_cal_matrix = self.get_matrices()
         return _10x_cal_matrix
 
-    def _10fff(self):
+    def energy_10fff(self):
         """ Return _6x calibration matrix """
         _6x_cal_matrix, _10x_cal_matrix, _10fff_cal_matrix = self.get_matrices()
         return _10fff_cal_matrix
@@ -413,13 +418,14 @@ def transform(energy, filename):
     """ Input: energy, filename of newly uploaded EPID image """
     if energy == "6x":
         """ Transform the 6x energy """
-        cal = Calibrate._6x()
+        # get new centre
         centre = Image(filename).get_centre()
         profile_x, profile_y = Image(filename).central_profiles()
         # shift and convert to distance
         x_array_x, shifted_x = process_profile(profile_x, centre[0])
         x_array_y, shifted_y = process_profile(profile_y, centre[1])
-        # apply matrix - need centre from the original
+        # apply matrix - need centre from the original and new image
+        centre = Calibrate.centre_6x()
 
 
 

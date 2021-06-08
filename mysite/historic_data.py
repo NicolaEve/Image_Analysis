@@ -66,47 +66,35 @@ for folder in os.listdir(dir):
                 for new_file in os.listdir(xim_directory):
                     if new_file.endswith(".png") or new_file.endswith(".jpeg"):
                         image_file = os.path.join(xim_directory, new_file)
-                # apply the transformation matrix for the beam energy
-                # this needs changing to include taking the average of +/-10 pixel rows
-                # average from the profiles adjacent to centre
-                # but is that assuming the adajcent 10 are the centre and then applying calibration
-                # or applying the transformation matrix and then taking avergae?
-                inline, crossline = main.TransformView("6x", image_file).transform()
-                # structure of inline and crossline = [x, y, symmetry, flatness, date]
+                        # apply the transformation matrix for the beam energy
+                        # this needs changing to include taking the average of +/-10 pixel rows
+                        # average from the profiles adjacent to centre
+                        # but is that assuming the adajcent 10 are the centre and then applying calibration
+                        # or applying the transformation matrix and then taking avergae?
+                        inline, crossline = main.TransformView("6x", image_file).transform()
+                        # structure of inline and crossline = [x, y, symmetry, flatness]
+                        raw_inline, raw_crossline = main.TransformView("6x", image_file).untransformed_data()
+                        # take the symmetry and flatness before applying the calibration matrix
+                        # enter into database
+                        cursor.execute("EXEC Insert_Symm_Flat_Data ?,?,?,?,?", [mpc_event_id, 1, 0, raw_inline[0], raw_inline[1]])
+                        cursor.commit()
+                        # repeat for crossline
 
-                # enter date and beam energy to database
-                # 1 for inline
-                # 1 for transformed
-                # get the mapping id
-                statement = """declare @mapping_id int;
-                                    EXEC @mapping_id = Insert_Symm_Flat_Data ?,?,?,?,?;
-                                    SELECT @mapping_id as mapping_id; """
-                cursor.execute(statement, [mpc_event_id, 1, 1, inline[2], inline[3]])
-                mapping_id = cursor.fetchval()
-                cursor.commit()
+                        # enter into database
+                        cursor.execute("EXEC Insert_Symm_Flat_Data ?,?,?,?,?", [mpc_event_id, 0, 0, raw_crossline[0], raw_crossline[1]])
+                        cursor.commit()
 
-                # add raw data into the database
-                for i in range(len(inline[0])):
-                    x = inline[0][i]
-                    y = inline[1][i]
-                    cursor.execute("EXEC Insert_Raw_Values ?,?,?", [mapping_id, x, y])
-                    cursor.commit()
+                        # enter date and beam energy to database
+                        # 1 for inline
+                        # 1 for transformed
+                        cursor.execute("EXEC Insert_Symm_Flat_Data ?,?,?,?,?", [mpc_event_id, 1, 1, inline[2], inline[3]])
+                        cursor.commit()
+                        # repeat for crossline
+                        cursor.execute("EXEC Insert_Symm_Flat_Data ?,?,?,?,?", [mpc_event_id, 0, 1, crossline[2], crossline[3]])
+                        cursor.commit()
 
-                # repeat for crossline
-                statement = """declare @mapping_id int;
-                                EXEC @mapping_id = Insert_Symm_Flat_Data ?,?,?,?,?;
-                                SELECT @mapping_id as mapping_id; """
-                cursor.execute(statement, [mpc_event_id, 0, 1, crossline[2], crossline[3]])
-                mapping_id = cursor.fetchval()
-                cursor.commit()
-                for i in range(len(crossline[0])):
-                    x = crossline[0][i]
-                    y = crossline[1][i]
-                    cursor.execute("EXEC Insert_Raw_Values ?,?,?", [mapping_id, x, y])
-                    cursor.commit()
 
                 # compare to the MPC results
-                # get symmetry and flatness from the raw data for comparison
                 # extract the reported results in the excel file
             if str(file) == "Results.csv":
                 results_file = os.path.join(path, file)

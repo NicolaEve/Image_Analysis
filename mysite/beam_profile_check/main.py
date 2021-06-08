@@ -4,6 +4,9 @@ Image: basic image functions, read, guaussian blue, greyscale
 Edges: sobel edge detection of an image
 Profiles: finds peaks, field corners, centre and plot functions
 Transform: functions to calculate matrix of offset dose ratios in order to calibrate water tank doses to MPC profiles
+TransformView: functions to apply the calibration matrix to the newly generated MPC EPID image,
+returning symmetry and flatness metrics
+SNC: reads the data from the water tank snc from 1st April 2021, for calibration
 
 The script maps the beam profile check data from the MPC from 1st April 2021 onto
 corresponding values from the SNC water phantom acquired on 1st April 2021.
@@ -595,12 +598,11 @@ def run_calibration():
     return _6x_matrix, _10x_matrix, _10fff_matrix, _6x_sobel, _10x_sobel, _10fff_sobel
 
 
-
 class TransformView:
-    """class to apply the transformation matrices onto new images """
+    """ Class to apply the transformation matrices onto new images """
 
     def __init__(self, energy, filename):
-        """ energy is which beam we are transforming, 6x, 10x, or 10xfff,
+        """ Energy is which beam we are transforming, 6x, 10x, or 10xfff,
          filename is the newly uploaded image """
         self.energy = energy
         self.filename = filename
@@ -638,7 +640,7 @@ class TransformView:
         xs = np.linspace(0, len(profile), len(profile))
         shifted_xs = [(x - int(centre_cood)) * 0.0336 for x in xs]
         # normalise profile
-        normalised_array= normalise(shifted_xs, profile)
+        normalised_array = normalise(shifted_xs, profile)
 
         return shifted_xs, normalised_array
 
@@ -685,6 +687,30 @@ class TransformView:
         return [x_array_x, transformed_profile_x, symmetry_x, flatness_x], \
                [x_array_y, transformed_profile_y, symmetry_y, flatness_y]
 
+    def untransformed_data(self):
+        """ Returns symmetry and flatness of the newly generated EPID MPC image
+        without applying the calibration to water tank"""
+        # get central profiles of newly uploaded image
+        img0 = Image(self.filename)
+        image_sobel = Edges.sobel_edges(img0)
+        # find centre
+        new_centre = Profiles(image_sobel, [300, 900], [300, 900]).get_centre()
+        # filter profiles
+        central_profiles = Profiles(img0.gray(), [int(new_centre[0])], [int(new_centre[1])])
+        profile_x, profile_y = central_profiles.filter()
+
+        # normalise, shift, convert to distance
+        x_array_x, normalised_array_x = self.process_profile(profile_x[0], new_centre[0])
+        x_array_y, normalised_array_y = self.process_profile(profile_y[0], new_centre[1])
+
+        symmetry_x = symmetry(x_array_x, normalised_array_x)
+        symmetry_y = symmetry(x_array_y, normalised_array_y)
+
+        flatness_x = flatness(x_array_x, normalised_array_x)
+        flatness_y = flatness(x_array_y, normalised_array_y)
+
+        return [symmetry_x, flatness_x], \
+               [symmetry_y, flatness_y]
 
 
 

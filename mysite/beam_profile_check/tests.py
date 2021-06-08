@@ -143,6 +143,8 @@ class StaticTests(unittest.TestCase):
         self.normalise = normalise
         self.interpolate = interpolate
         self.core_80 = core_80
+        self.symmetry = symmetry
+        self.flatness = flatness
 
     def test_normalise(self):
         """ Test the normalising function """
@@ -162,18 +164,44 @@ class StaticTests(unittest.TestCase):
 
     def test_core_80(self):
         """ Test the function which returns the central 80% of the field """
-        x_array = np.linspace(-10, 10, 100)
-        profile = x_array**2
-        exp_80 = profile[20:80]
+        profile = [1, 5, 10, 10, 10,
+                   10, 10, 10, 10, 10,
+                   10, 5, 1]
+        x_array = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        exp_80 = profile[2:10]
         out_80, lwr_index = self.core_80(x_array, profile)
-        self.assertEqual(lwr_index, 20)
+        self.assertEqual(lwr_index, 2)
         np.testing.assert_array_equal(exp_80, out_80)
+
+    def test_symmetry(self):
+        """ Test the symmetry function """
+        profile = [1, 5, 10, 10, 10,
+                   10, 10, 10, 10, 10,
+                   10, 5, 1]
+        x_array = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        symm = self.symmetry(x_array, profile)
+        self.assertEqual(symm, 0)
+
+        profile = [1, 5, 10, 6, 10,
+                   10, 1, 10, 10, 10,
+                   10, 5, 1]
+        x_array = [0, 1, 2, 3, 4, 5, 0, 7, 8, 9, 10, 11, 12]
+        symm = self.symmetry(x_array, profile)
+        self.assertEqual(symm, 90)
+
+    def test_flatness(self):
+        """ Test the flatness function """
+        profile = [1, 5, 10, 6, 10,
+                   10, 1, 10, 10, 10,
+                   10, 5, 1]
+        x_array = [0, 1, 2, 3, 4, 5, 0, 7, 8, 9, 10, 11, 12]
+        av = 77 / 9
+        max_perc_diff = 100*((av-1)/av)
+        flat = self.flatness(x_array, profile)
+        self.assertAlmostEqual(flat, max_perc_diff)
 
     def tearDown(self):
         """ Run post each test."""
-        pass
-
-    def core_80(self, x_array, profile):
         pass
 
 
@@ -210,15 +238,6 @@ class FieldTests(unittest.TestCase):
         # negative squared function has max value at -0, positioned in centre
         self.assertListEqual(positions, [(50,), (50,)])
         self.assertListEqual(max_values, [(-0,), (-0,)])
-
-   # def test_field_size(self):
-        """ Test the field size of the EPID and the water phantom are equal """
-        [_6x_inline, _6x_crossline,
-         _10x_inline, _10x_crossline,
-         _10fff_inline, _10fff_crossline] = SNC.read_dose_tables() # this is the calibration one?
-        # don't we want to do this for new images?
-        # so how to do this?
-        # field size is x distance where f''=0, at 50% of height
 
     def tearDown(self):
         """Run post each test."""
