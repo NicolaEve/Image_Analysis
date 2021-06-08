@@ -592,6 +592,9 @@ def run_calibration():
                 # get the transform matrix
                 _10fff_matrix = _10fff_mapping.dose_matrix()
 
+    return _6x_matrix, _10x_matrix, _10fff_matrix, _6x_sobel, _10x_sobel, _10fff_sobel
+
+
 
 class TransformView:
     """class to apply the transformation matrices onto new images """
@@ -604,23 +607,25 @@ class TransformView:
 
     def get_matrix(self):
         """ Extract the calibration matrix for the corresponding beam energy """
+        _6x_matrix, _10x_matrix, _10fff_matrix, _6x_sobel, _10x_sobel, _10fff_sobel = run_calibration()
         if self.energy == "6x":
-            matrix = run_calibration._6x_matrix
+            matrix = _6x_matrix
         if self.energy == "10x":
-            matrix = run_calibration._10x_matrix
+            matrix = _10x_matrix
         if self.energy == "10fff":
-            matrix = run_calibration._10fff_matrix
+            matrix = _10fff_matrix
 
         return matrix
 
     def get_original_centre(self):
         """ Find centre of field in calibration image """
+        _6x_matrix, _10x_matrix, _10fff_matrix, _6x_sobel, _10x_sobel, _10fff_sobel = run_calibration()
         if self.energy == "6x":
-            centre = run_calibration._6x_sobel.get_centre()
+            centre = _6x_sobel.get_centre()
         if self.energy == "10x":
-            centre = run_calibration._10x_sobel.get_centre()
+            centre = _10x_sobel.get_centre()
         if self.energy == "10fff":
-            centre = run_calibration._10x_sobel.get_centre()
+            centre = _10x_sobel.get_centre()
 
         return centre
 

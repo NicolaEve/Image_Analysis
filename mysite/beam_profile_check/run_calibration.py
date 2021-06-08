@@ -228,9 +228,9 @@ class Calibrate:
     """ Class to calibrate the water phantom images to the MPC EPID images
         Input: full path and file location where .snctxt files and .. are stored """
 
-    def __init__(self, snc_dir, mpc_dir):
-        self.snc_dir = snc_dir
-        self. mpc_dir = mpc_dir
+    def __init__(self):
+        self.snc_dir = os.path.join(os.getcwd(), "Calibration_Data")
+        self. mpc_dir = os.path.join(os.getcwd(), "Calibration_Data")
         # snc and mpc is directory = os.path.join(os.getcwd(), "Calibration_Data")
 
     def snc_data(self):
@@ -364,110 +364,66 @@ class Calibrate:
 
         return dose_matrix
 
-    def _6x_calibration_matrix(self):
-        """ Return the 6x calibration matrix """
+    def get_matrices(self):
+        """ Get the calibration matrix for each beam energy """
         # get the mpc and snc data
         _6x_mpc, _10x_mpc, _10fff_mpc = self.mpc_data()
         [_6x_inline, _6x_crossline,
          _10x_inline, _10x_crossline,
          _10fff_inline, _10fff_crossline] = self.snc_data()
 
-        # run the matrix function for 6x
+        # run the matrix function for each energy
+        _6x_cal_matrix = self.matrix([_6x_inline, _6x_crossline], _6x_mpc)
+        _10x_cal_matrix = self.matrix([_10x_inline, _10x_crossline], _10x_mpc)
+        _10fff_cal_matrix = self.matrix([_10fff_inline, _10fff_crossline], _10fff_mpc)
+
+        return _6x_cal_matrix, _10x_cal_matrix, _10fff_cal_matrix
+
+    def _6x(self):
+        """ Return _6x calibration matrix """
+        _6x_cal_matrix, _10x_cal_matrix, _10fff_cal_matrix = self.get_matrices()
+        return _6x_cal_matrix
+
+    def _10x(self):
+        """ Return _6x calibration matrix """
+        _6x_cal_matrix, _10x_cal_matrix, _10fff_cal_matrix = self.get_matrices()
+        return _10x_cal_matrix
+
+    def _10fff(self):
+        """ Return _6x calibration matrix """
+        _6x_cal_matrix, _10x_cal_matrix, _10fff_cal_matrix = self.get_matrices()
+        return _10fff_cal_matrix
 
 
-    class Transform:
+def process_profile(profile, centre_cood):
+    """ Input: profile = x or y profile; centre_cood = corresponding x or y central co-ordinate
+        Output: the shifted (w.r.t. centre) and normalised arrays, measured in distance """
+    # this just puts the plot symmetric about 0 and normalised and in distance
 
-        def __init__(self, df_list, profile_list, centre):
-            """ Input: df_list = The pandas dataframe from the water tank as [inline, crossline],
-            profile_list = x and y profiles and the EPID image
-             centre = central co-ordinate of the field """
-            self.df_list = df_list
-            self.profile_list = profile_list
-            self.centre = centre
+    # shift it to be centred at 0 and convert to cm, using MPC EPID resolution
+    xs = np.linspace(0, len(profile), len(profile))
+    shifted_xs = [(x - int(centre_cood)) * 0.0336 for x in xs]
+    # normalise profile
+    normalised_array= normalise(shifted_xs, profile)
 
-        def field_size(self, df, profile):
-            """ Calculate field size as distance between inflection points """
-
-            # first interpolate and normalise the df - inline/crossline
-            xs, ys = interpolate(df, profile)
-            normalised_ys = normalise(xs, ys)
-
-            # find the two values where the normalised y = 0.5
-            half = int(len(normalised_ys) * 0.5)
-
-            first_half = np.asarray(normalised_ys[0:half])
-            index_1 = (np.abs(first_half - 0.5)).argmin()
-
-            second_half = np.asarray(normalised_ys[half:len(normalised_ys)])
-            index_2 = half + (np.abs(second_half - 0.5)).argmin()
-
-            # distance is the difference on the corresponding x axis
-            distance = xs[index_2] - xs[index_1]
-
-            # finding where second derivtive is 0 could be more accurate?
-            # inflection at f"=0
-            # but how to find derivative of a list?
-
-            return distance
-
-        def plot(self, inline):
-            """ Plot the interpolated, normalised profiles and the ratio between them """
-            # inline is first entry
-            if inline is True:
-                df = self.df_list[0]
-                profile = self.profile_list[0]
-                title = "Inline"
-            else:
-                df = self.df_list[1]
-                profile = self.profile_list[1]
-                title = "Crossline"
-
-            new_xs, new_ys = interpolate(df, profile)
-            x_axis = new_xs
-            y_axis = normalise(new_xs, new_ys)
-            norm_profile = normalise(new_xs, profile)
-            ratio = []
-            # the ratio is the normalised dose from water phantom / pixel value from EPID profile
-            for i in range(len(x_axis)):
-                ratio.append(y_axis[i] / norm_profile[i])
-
-            plt.plot(x_axis, y_axis, label="Water Phantom")
-            plt.plot(x_axis, norm_profile, label="EPID Profile")
-            plt.plot(x_axis, ratio, label="Ratio Dose/Pixel")
-            plt.xlabel("Distance (cm)")
-            plt.ylabel("Normalised Dose")
-            plt.title(title)
-            plt.legend()
-            plt.show()
+    return shifted_xs, normalised_array
 
 
-    def run_calibration():
-        # run the above classes
-        # get the water phantom data
-        [_6x_inline, _6x_crossline,
-         _10x_inline, _10x_crossline,
-         _10fff_inline, _10fff_crossline] = SNC.read_dose_tables()
+def transform(energy, filename):
+    """ Input: energy, filename of newly uploaded EPID image """
+    if energy == "6x":
+        """ Transform the 6x energy """
+        cal = Calibrate._6x()
+        centre = Image(filename).get_centre()
+        profile_x, profile_y = Image(filename).central_profiles()
+        # shift and convert to distance
+        x_array_x, shifted_x = process_profile(profile_x, centre[0])
+        x_array_y, shifted_y = process_profile(profile_y, centre[1])
+        # apply matrix - need centre from the original
 
 
 
 
-                if filename.find("10x") != -1:
-                    _10x_central_profiles = Profiles(img0.gray(), [centre[0]], [centre[1]])
-                    _10x_sobel = Profiles(img, [300, 900], [300, 900])
-                    _10x_img = img0.gray()
-                    profile_x, profile_y = _10x_central_profiles.filter()
-                    _10x_mapping = Transform([_10x_inline, _10x_crossline], [profile_x[0], profile_y[0]], centre)
-                    # get the transform matrix
-                    _10x_matrix = _10x_mapping.dose_matrix()
-
-                if filename.find("10fff") != -1:
-                    _10fff_central_profiles = Profiles(img0.gray(), [centre[0]], [centre[1]])
-                    _10fff_sobel = Profiles(img, [300, 900], [300, 900])
-                    _10fff_img = img0.gray()
-                    profile_x, profile_y = _10fff_central_profiles.filter()
-                    _10fff_mapping = Transform([_10fff_inline, _10fff_crossline], [profile_x[0], profile_y[0]], centre)
-                    # get the transform matrix
-                    _10fff_matrix = _10fff_mapping.dose_matrix()
 
 
 
