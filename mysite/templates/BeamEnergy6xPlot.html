@@ -12,17 +12,18 @@
       </script>
 </head>
 <body>
-<p><h4>Inline Plot: Distance (cm) Against Dose Ratio</h4></p>
+<p><h4>Crossline Plot: Distance (cm) Against Dose Ratio</h4></p>
+<p><h4>centre shift is {{centre_shift}} mm </h4></p>
  {% autoescape off %}
   {{ plot_div }}
   {% endautoescape %}
-<p><h4>Symmetry = {{symm_x}} % </h4></p>
-<p><h4>Flatness = {{flatness_x}} % </h4></p>
-<p><h4>Crossline Plot: Distance (cm) Against Dose Ratio</h4></p>
+<p><h4>symmetry is {{symm_x}}</h4></p>
+<p><h4>flatness is {{flatness_x}}</h4></p>
+<p><h4>Inline Plot: Distance (cm) Against Dose Ratio</h4></p>
 {% autoescape off %}
   {{ plot_div_2 }}
   {% endautoescape %}
-<p><h4>Symmetry = {{symm_y}} %</h4></p>
-<p><h4>Flatness = {{flatness_y}} %</h4></p>
+<p><h4>symmetry is {{symm_y}}</h4></p>
+<p><h4>flatness is {{flatness_y}}</h4></p>
 </body>
 </html>

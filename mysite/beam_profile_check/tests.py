@@ -75,23 +75,6 @@ class ProfileTests(unittest.TestCase):
                         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]) # test array image
         self.profile = Profiles(image, [1], [1]) # test along these axis
 
-    def test_lines_no_intersection(self):
-        """ Test that the lines do not intersect """
-        # check lines do not intersect error is raised
-        line1 = [(0, 3), (3, 3)]
-        line2 = [(0, 6), (3, 6)]
-        # assert raises needs to be within a wrapper function to catch the error and not become a test error
-        # lamba is a wrapper
-        # with statement passes the error thrown by the function back into the assertRaises to catch it
-        with self.assertRaises(Exception): self.profile.line_intersection(line1, line2)
-
-    def test_line_intersection(self):
-        """ Test that the lines intersect at the correct point"""
-        # check correct point of intersection is found
-        line1 = [(0, 3), (3, 3)]
-        line2 = [(0, 0), (0, 6)]
-        self.assertTupleEqual(self.profile.line_intersection(line1, line2), (0, 3))
-
     def test_get_profiles(self):
         """ Test that it retrieves the correct profiles """
         x_profile, y_profile = self.profile.get_profiles()
@@ -145,6 +128,8 @@ class StaticTests(unittest.TestCase):
         self.core_80 = core_80
         self.symmetry = symmetry
         self.flatness = flatness
+        self.line_intersection = line_intersection
+        self.process_profile = process_profile
 
     def test_normalise(self):
         """ Test the normalising function """
@@ -192,13 +177,54 @@ class StaticTests(unittest.TestCase):
     def test_flatness(self):
         """ Test the flatness function """
         profile = [1, 5, 10, 6, 10,
-                   10, 1, 10, 10, 10,
+                   10, 2, 10, 10, 10,
                    10, 5, 1]
         x_array = [0, 1, 2, 3, 4, 5, 0, 7, 8, 9, 10, 11, 12]
-        av = 77 / 9
-        max_perc_diff = 100*((av-1)/av)
         flat = self.flatness(x_array, profile)
-        self.assertAlmostEqual(flat, max_perc_diff)
+        self.assertEqual(flat, 500)
+
+        profile = [1, 5, 10, 10, 10,
+                   10, 10, 10, 10, 10,
+                   10, 5, 1]
+        flat = self.flatness(x_array, profile)
+        self.assertEqual(flat, 100)
+
+    def test_lines_no_intersection(self):
+        """ Test that the lines do not intersect """
+        # check lines do not intersect error is raised
+        line1 = [(0, 3), (3, 3)]
+        line2 = [(0, 6), (3, 6)]
+        # assert raises needs to be within a wrapper function to catch the error and not become a test error
+        # lamba is a wrapper
+        # with statement passes the error thrown by the function back into the assertRaises to catch it
+        with self.assertRaises(Exception): self.line_intersection(line1, line2)
+
+    def test_line_intersection(self):
+        """ Test that the lines intersect at the correct point"""
+        # check correct point of intersection is found
+        line1 = [(0, 3), (3, 3)]
+        line2 = [(0, 0), (0, 6)]
+        self.assertTupleEqual(self.line_intersection(line1, line2), (0, 3))
+
+    def test_process_profile(self):
+        """ Test the profile function shifts to the centre, normalises and converts to distance """
+
+        # set the input variables
+        profile = [0, 1, 2, 3, 4, 3, 2, 1, 0]
+        centre = 4
+
+        # get the expected output by shifting the x axis
+        shifted_xs = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
+        # convert to distance
+        exp_xs = [x * 0.0336 for x in shifted_xs]
+        # normalise profile
+        exp_profile = [y / 4 for y in profile]
+
+        out_xs, out_profile = self.process_profile(profile, centre)
+        np.testing.assert_array_equal(out_xs, exp_xs)
+        np.testing.assert_array_equal(out_profile, exp_profile)
+
+        # is this using the same method as the function in main? is that robust?
 
     def tearDown(self):
         """ Run post each test."""

@@ -13,7 +13,6 @@ from plotly.offline import plot
 from plotly.graph_objs import Scatter
 from .models import *
 from django.views.generic import ListView
-from .run_calibration import *
 from .main import *
 import os
 import datetime as dt
@@ -108,18 +107,23 @@ def beam_energy_10x_display_plot(request):
             if file.endswith(".png") or file.endswith(".jpeg"):
                 filename = os.path.join(xim_directory, file)
 
-        inline, crossline = TransformView("10x", filename).transform()
+        obj = NewImages("10x", filename)
+        crossline, inline = obj.apply_calibration()
+        crossline_symm, inline_symm = obj.symmetry(transformed=True)
+        crossline_flat, inline_flat = obj.flatness(transformed=True)
+        centre_shift = obj.centre_shift()
 
-        plot_div = plot([Scatter(x=inline[0], y=inline[1],
+        plot_div = plot([Scatter(x=crossline[0], y=crossline[1],
                                  mode='lines', name='test',
                                  opacity=0.8)], output_type='div')
-        plot_div_2 = plot([Scatter(x=crossline[0], y=crossline[1],
-                                 mode='lines', name='test',
-                                 opacity=0.8)], output_type='div')
+        plot_div_2 = plot([Scatter(x=inline[0], y=inline[1],
+                                   mode='lines', name='test',
+                                   opacity=0.8)], output_type='div')
         return render(request, 'BeamEnergy10xPlot.html',
                       context={'plot_div': plot_div, 'plot_div_2': plot_div_2,
-                               'symm_x': inline[2], 'symm_y': crossline[2],
-                               'flatness_x': inline[3], 'flatness_y': crossline[3]})
+                               'symm_x': crossline_symm, 'symm_y': inline_symm,
+                               'flatness_x': crossline_flat, 'flatness_y': inline_flat,
+                               'centre_shift': centre_shift})
 
 
 def beam_energy_6x_display_plot(request):
@@ -135,18 +139,23 @@ def beam_energy_6x_display_plot(request):
             if file.endswith(".png") or file.endswith(".jpeg"):
                 filename = os.path.join(xim_directory, file)
 
-        inline, crossline = TransformView("6x", filename).transform()
+        obj = NewImages("6x", filename)
+        crossline, inline = obj.apply_calibration()
+        crossline_symm, inline_symm = obj.symmetry(transformed=True)
+        crossline_flat, inline_flat = obj.flatness(transformed=True)
+        centre_shift = obj.centre_shift()
 
-        plot_div = plot([Scatter(x=inline[0], y=inline[1],
+        plot_div = plot([Scatter(x=crossline[0], y=crossline[1],
                                  mode='lines', name='test',
                                  opacity=0.8)], output_type='div')
-        plot_div_2 = plot([Scatter(x=crossline[0], y=crossline[1],
-                                 mode='lines', name='test',
-                                 opacity=0.8)], output_type='div')
+        plot_div_2 = plot([Scatter(x=inline[0], y=inline[1],
+                                   mode='lines', name='test',
+                                   opacity=0.8)], output_type='div')
         return render(request, 'BeamEnergy6xPlot.html',
                       context={'plot_div': plot_div, 'plot_div_2': plot_div_2,
-                               'symm_x': inline[2], 'symm_y': crossline[2],
-                               'flatness_x': inline[3], 'flatness_y': crossline[3]})
+                               'symm_x': crossline_symm, 'symm_y': inline_symm,
+                               'flatness_x': crossline_flat, 'flatness_y': inline_flat,
+                               'centre_shift': centre_shift})
 
 
 def beam_energy_10fff_display_plot(request):
@@ -162,18 +171,23 @@ def beam_energy_10fff_display_plot(request):
             if file.endswith(".png") or file.endswith(".jpeg"):
                 filename = os.path.join(xim_directory, file)
 
-        inline, crossline = TransformView("10fff", filename).transform()
+        obj = NewImages("10fff", filename)
+        crossline, inline = obj.apply_calibration()
+        crossline_symm, inline_symm = obj.symmetry(transformed=True)
+        crossline_flat, inline_flat = obj.flatness(transformed=True)
+        centre_shift = obj.centre_shift()
 
-        plot_div = plot([Scatter(x=inline[0], y=inline[1],
+        plot_div = plot([Scatter(x=crossline[0], y=crossline[1],
                                  mode='lines', name='test',
                                  opacity=0.8)], output_type='div')
-        plot_div_2 = plot([Scatter(x=crossline[0], y=crossline[1],
-                                 mode='lines', name='test',
-                                 opacity=0.8)], output_type='div')
+        plot_div_2 = plot([Scatter(x=inline[0], y=inline[1],
+                                   mode='lines', name='test',
+                                   opacity=0.8)], output_type='div')
         return render(request, 'BeamEnergy10fffPlot.html',
                       context={'plot_div': plot_div, 'plot_div_2': plot_div_2,
-                               'symm_x': inline[2], 'symm_y': crossline[2],
-                               'flatness_x': inline[3], 'flatness_y': crossline[3]})
+                               'symm_x': crossline_symm, 'symm_y': inline_symm,
+                               'flatness_x': crossline_flat, 'flatness_y': inline_flat,
+                               'centre_shift': centre_shift})
 
 
 def most_recent_plot(request):

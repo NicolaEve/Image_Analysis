@@ -11,8 +11,7 @@ Contact: nicola.compton@ulh.nhs.uk
 """
 
 from django.db import models
-from . import run_calibration
-from .main import Edges, Image, Profiles, normalise
+from .main import *
 import numpy as np
 
 #class Index(models.Model):

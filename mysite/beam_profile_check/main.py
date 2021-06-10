@@ -18,7 +18,6 @@ Date: 24th May 2021
 Contact: nicola.compton@ulh.nhs.uk
 """
 
-# importing modules
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
@@ -27,6 +26,7 @@ from scipy.interpolate import interp1d
 from scipy.signal import savgol_filter
 import os
 import pandas as pd
+from scipy.spatial import distance
 
 
 def normalise(x_array, y_array):
@@ -101,7 +101,7 @@ def symmetry(x_array, transformed_profile):
     for i in range(int(len(field_80)*0.5)):
         right = index_centre + i
         left = index_centre - i
-        cpd_percentage = 100 * (np.abs((field_80[right] - field_80[left])) / field_80[index_centre])
+        cpd_percentage = 100 * (np.abs((field_80[right] - field_80[left])) / field_80[index_centre])# don't need?
         symm.append(cpd_percentage)
 
     symmetry = max(symm)
@@ -112,19 +112,59 @@ def symmetry(x_array, transformed_profile):
 def flatness(x_array, transformed_profile):
     """ Find the flatness of the field, in the middle 80% """
 
-    # find percentage difference of the values in the middle 80%
+    # get the central 80% of the field
     field_80, lrw = core_80(x_array, transformed_profile)
-    # flatness is max absolute deviation from mean, expressed as percentage
-    flat = []
-    for x in field_80:
-        diff = np.abs(x - np.mean(field_80))
-        perc = 100 * (diff / np.mean(field_80))
-        flat.append(perc)
-    flatness = max(flat)
-    return flatness
+
+    # flatness is the ratio of maximum to minimum value
+    flat = 100 * (max(field_80) / min(field_80))
+
+    return flat
+
+
+def line_intersection(line1, line2):
+    """ This function finds the intersection point between two lines
+        Input: two lines as defined by two (x,y) co-ordinates i.e. line1=[(x,y),(x,y)]
+        Output: (x,y) co-ordinate of the point of intersection """
+
+    # differences in x and y for each line
+    xdiff = (line1[0][0] - line1[1][0], line2[0][0] - line2[1][0])
+    ydiff = (line1[0][1] - line1[1][1], line2[0][1] - line2[1][1])
+
+    # find the determinant
+    def det(a, b):
+        """ Returns the determinant of the vectors a and b """
+        return a[0] * b[1] - a[1] * b[0]
+
+    # take the determinant of the lines
+    div = det(xdiff, ydiff)
+    if div == 0:
+        raise Exception('lines do not intersect')
+
+    # find the co-ordinates of the point of intersection
+    d = (det(*line1), det(*line2))
+    x = det(d, xdiff) / div
+    y = det(d, ydiff) / div
+
+    return x, y
+
+
+def process_profile(profile, centre_cood):
+    """ Input: profile = x or y profile; centre_cood = corresponding x or y central co-ordinate
+        Output: the shifted (w.r.t. centre) and normalised arrays, measured in distance """
+    # this just puts the plot symmetric about 0 and normalised and in distance
+
+    # shift it to be centred at 0 and convert to cm, using MPC EPID resolution
+    xs = np.arange(0, len(profile), 1)
+    shifted_xs = [(x - int(centre_cood)) * 0.0336 for x in xs]
+    # normalise profile
+    normalised_array = normalise(shifted_xs, profile)
+
+    return shifted_xs, normalised_array
 
 
 class Image:
+    """ Class for processing the EPID image from MPC.
+        Input: filename and path of the image in .png or .jpeg format """
 
     def __init__(self, filename):
         self.filename = filename
@@ -144,13 +184,7 @@ class Image:
         unnoisy_img = cv2.GaussianBlur(self.gray(), (3, 3), 0)
         return unnoisy_img
 
-
-class Edges(Image):
-
-    def __init__(self):
-        super().__init__(filename)
-
-    def sobel_edges(self):
+    def sobel(self):
         """ Detects the edges of an image using a sobel operator using the blurred grayscale image """
 
         # find edges using sobel operator
@@ -161,36 +195,20 @@ class Edges(Image):
         mag *= 255.0 / np.max(mag)  # normalise
         return mag
 
-
-class Profiles:
-
-    def __init__(self, image, x_axis, y_axis):
-        """ Arbitary lines across which to take the profiles, axis must be lists """
-        self.image = image
-        self.x_axis = x_axis
-        self.y_axis = y_axis
-
-    def get_profiles(self):
-        """ Take the profiles of the image along the axis lines """
-        profile_x = [self.image[i, :] for i in self.x_axis]
-        profile_y = [self.image[:, j] for j in self.y_axis]
-        return profile_x, profile_y
-
-    def filter(self):
-        """ Smooth profiles with Savitzky-Golay filter """
-        profile_x, profile_y = self.get_profiles()
+    def filter_profiles(self, image, x_axis, y_axis):
+        """ Take the profiles of the image along the axis lines
+        and smooth profiles with Savitzky-Golay filter"""
+        profile_x = [image[i, :] for i in x_axis]
+        profile_y = [image[:, j] for j in y_axis]
         filtered_x = [savgol_filter(profile, 43, 3) for profile in profile_x]
         filtered_y = [savgol_filter(profile, 43, 3) for profile in profile_y]
         return filtered_x, filtered_y
 
-    def get_average_profile(self):
-        """ Take the average profile from -/+ 10 about profile given """
-        profile_x=[]
-        profile_y=[]
-        for offset in np.linspace(-10,10,21):
-            profile_x.append([self.image[i+offset, :] for i in self.x_axis])
-            profile_y.append([self.image[:, j+offset] for j in self.y_axis])
-        return np.mean(profile_x), np.mean(profile_y)
+    def noisy_profiles(self, image, x_axis, y_axis):
+        """ Take the profiles of the image along the axis lines """
+        profile_x = image[x_axis, :]
+        profile_y = image[:, y_axis]
+        return profile_x, profile_y
 
     def get_max_peaks(self, array_list):
         """ Find the peaks of profiles in array_list using peakdetect.py
@@ -212,7 +230,12 @@ class Profiles:
     def plot_peaks(self):
         """ Plot the filtered profile with the peaks to check they are accurate """
 
-        filtered_x, filtered_y = self.filter()
+        # sobel image
+        image = self.sobel()
+        # arbitary profiles
+        x_axis = [300, 900]
+        y_axis = [300, 900]
+        filtered_x, filtered_y = self.filter_profiles(image, x_axis, y_axis)
         filtered = filtered_x + filtered_y
         positions, max_values = self.get_max_peaks(filtered)
 
@@ -224,49 +247,28 @@ class Profiles:
         plt.suptitle("Filtered Profiles with Peaks")
         plt.show()
 
-    def line_intersection(self, line1, line2):
-        """ This function finds the intersection point between two lines
-            Input: two lines as defined by two (x,y) co-ordinates i.e. line1=[(x,y),(x,y)]
-            Output: (x,y) co-ordinate of the point of intersection """
-
-        # differences in x and y for each line
-        xdiff = (line1[0][0] - line1[1][0], line2[0][0] - line2[1][0])
-        ydiff = (line1[0][1] - line1[1][1], line2[0][1] - line2[1][1])
-
-        # find the determinant
-        def det(a, b):
-            """ Returns the determinant of the vectors a and b """
-            return a[0] * b[1] - a[1] * b[0]
-
-        # take the determinant of the lines
-        div = det(xdiff, ydiff)
-        if div == 0:
-            raise Exception('lines do not intersect')
-
-        # find the co-ordinates of the point of intersection
-        d = (det(*line1), det(*line2))
-        x = det(d, xdiff) / div
-        y = det(d, ydiff) / div
-
-        return x, y
-
     def get_corners(self):
-        """ Find the corners by finding points of intersection between peaks """
+        """ Find the corners of the sobel image by finding points of intersection between peaks """
+
+        # take profiles of the sobel image along arbitary lines
+        image = self.sobel()
+        x_axis = [300, 900]
+        y_axis = [300, 900]
+        filtered_x, filtered_y = self.filter_profiles(image, x_axis, y_axis)
+        filtered = filtered_x + filtered_y
 
         # get peaks
-        filtered_x, filtered_y = self.filter()
-        filtered = filtered_x + filtered_y
         positions, max_values = self.get_max_peaks(filtered)
         position_list = [i for sub in positions for i in sub]  # concatanate tuples into list
 
         # find corners by drawing a line through the peaks
-        top_line = [(self.x_axis[0], position_list[0]), (self.x_axis[1], position_list[2])]
-        bottom_line = [(self.x_axis[0], position_list[1]), (self.x_axis[1], position_list[3])]
-        left_line = [(position_list[4], self.y_axis[0]), (position_list[6], self.y_axis[1])]
-        right_line = [(position_list[5], self.y_axis[0]), (position_list[7], self.y_axis[1])]
+        top_line = [(x_axis[0], position_list[0]), (x_axis[1], position_list[2])]
+        bottom_line = [(x_axis[0], position_list[1]), (x_axis[1], position_list[3])]
+        left_line = [(position_list[4], y_axis[0]), (position_list[6], y_axis[1])]
+        right_line = [(position_list[5], y_axis[0]), (position_list[7], y_axis[1])]
 
-        corners = [self.line_intersection(top_line, left_line), self.line_intersection(top_line, right_line),
-                   self.line_intersection(bottom_line, left_line), self.line_intersection(bottom_line, right_line)]
+        corners = [line_intersection(top_line, left_line), line_intersection(top_line, right_line),
+                   line_intersection(bottom_line, left_line), line_intersection(bottom_line, right_line)]
 
         return corners
 
@@ -279,57 +281,53 @@ class Profiles:
         # draw line between corners to find centre of the field
         diag_1 = [top_left, bottom_right]
         diag_2 = [top_right, bottom_left]
-        x, y = self.line_intersection(diag_1, diag_2)
-        return x, y
+        x, y = line_intersection(diag_1, diag_2)
+        return int(x), int(y)
 
-    def field_size_pixels(self):
-        """ Find the size of the field in number of pixels """
+    def central_profiles(self):
+        """ Get the x and y profiles as an average of the central +/- 5mm = 15 pixels """
+        # find the centre of the sobel image
+        centre = self.get_centre()
+        # use centre co-ordinates as axis from which to take the profile
+        # take profiles from the grey image
+        image = self.gray()
+        # set up an  empty list from which to take the average
+        x_axis = []
+        y_axis = []
+        for i in range(-15, 15, 1):
+            x_axis.append(centre[0] + i)
+            y_axis.append(centre[1] + i)
+        # apply the filter along all the profiles
+        filtered_x, filtered_y = self.filter_profiles(image, x_axis, y_axis)
 
-        # get corners
-        [top_left, top_right, bottom_left, bottom_right] = self.get_corners()
-
-        # get distance, assume no tilt
-        distance_lr = top_right[0] - top_left[0]
-        distance_ud = bottom_left[1] - top_left[1]
-
-        field_size_pixels = [distance_lr, distance_ud]
-
-        return field_size_pixels
-
-    def field_size_cm(self):
-        """ Find the size of the field in cm """
-
-        # get corners
-        [top_left, top_right, bottom_left, bottom_right] = self.get_corners()
-
-        # get distance, assume no tilt
-        distance_lr = top_right[0] - top_left[0]
-        distance_ud = bottom_left[1] - top_left[1]
-
-        # convert pixel to mm
-        # one pixel = 	0.035? need to check this
-        field_size_cm = [0.0336 * distance_lr, 0.0336 * distance_ud]
-
-        return field_size_cm
+        # then take the average of the filtered profiles
+        # axis 0 so that we have an array
+        central_profiles = np.mean(filtered_x, axis=0), np.mean(filtered_y, axis=0)
+        return central_profiles
 
     def plot_sobel_corners(self):
         """ Plot the sobel image with peaks
             (peaks are the edges of the field) """
 
-        # get peaks
-        filtered_x, filtered_y = self.filter()
+        # sobel image
+        image = self.sobel()
+        # arbitary profiles
+        x_axis = [300, 900]
+        y_axis = [300, 900]
+        filtered_x, filtered_y = self.filter_profiles(image, x_axis, y_axis)
         filtered = filtered_x + filtered_y
+        # get peaks
         positions, max_values = self.get_max_peaks(filtered)
         position_list = [i for sub in positions for i in sub]  # concatanate tuples into list
 
         # plot the sobel image
-        plt.imshow(self.image)
+        plt.imshow(image)
 
         # plot the edges of the field
-        edges= [(self.x_axis[0], position_list[0]), (self.x_axis[1], position_list[2]),
-                (self.x_axis[0], position_list[1]), (self.x_axis[1], position_list[3]),
-                (position_list[4], self.y_axis[0]), (position_list[6], self.y_axis[1]),
-                (position_list[5], self.y_axis[0]), (position_list[7], self.y_axis[1])]
+        edges= [(x_axis[0], position_list[0]), (x_axis[1], position_list[2]),
+                (x_axis[0], position_list[1]), (x_axis[1], position_list[3]),
+                (position_list[4], y_axis[0]), (position_list[6], y_axis[1]),
+                (position_list[5], y_axis[0]), (position_list[7], y_axis[1])]
 
         # plot the edges of the field and their intersection at the corners
         corners = self.get_corners()
@@ -342,161 +340,53 @@ class Profiles:
 
         plt.show()
 
-    def plot_profiles(self):
-        """ Plot x and y profiles with and without noise """
+    def plot_central_profiles(self):
+        """ Plot central x and y profiles with and without noise """
+
+        # grey image
+        image = self.gray()
+        # get centre
+        centre = self.get_centre()
 
         # get profiles
-        noisy_x, noisy_y = self.get_profiles()
-        filtered_x, filtered_y = self.filter()
+        noisy_x, noisy_y = self.noisy_profiles(image, centre[0], centre[1])
+        filtered_x, filtered_y = self.central_profiles()
 
         # plot x profile
-        plt.plot(np.linspace(1, len(noisy_x[0]), len(noisy_x[0])), noisy_x[0], label="Noisy")
-        plt.plot(np.linspace(1, len(filtered_x[0]), len(filtered_x[0])), filtered_x[0], label="Filtered")
+        plt.plot(np.linspace(1, len(noisy_x), len(noisy_x)), noisy_x, label="Noisy")
+        plt.plot(np.linspace(1, len(filtered_x), len(filtered_x)), filtered_x, label="Filtered")
         plt.title("X Profile")
         plt.legend()
         plt.show()
 
         # plot y profile
-        plt.plot(np.linspace(1, len(noisy_y[0]), len(noisy_y[0])), noisy_y[0], label="Noisy")
-        plt.plot(np.linspace(1, len(filtered_y[0]), len(filtered_y[0])), filtered_y[0], label="Filtered")
+        plt.plot(np.linspace(1, len(noisy_y), len(noisy_y)), noisy_y, label="Noisy")
+        plt.plot(np.linspace(1, len(filtered_y), len(filtered_y)), filtered_y, label="Filtered")
         plt.title("Y Profile")
         plt.legend()
         plt.show()
 
 
-class Transform:
-
-    def __init__(self, df_list, profile_list, centre):
-        """ Input: df_list = The pandas dataframe from the water tank as [inline, crossline],
-        profile_list = x and y profiles and the EPID image
-         centre = central co-ordinate of the field """
-        self.df_list = df_list
-        self.profile_list = profile_list
-        self.centre = centre
-
-    def field_size(self, df, profile):
-        """ Calculate field size as distance between inflection points """
-
-        # first interpolate and normalise the df - inline/crossline
-        xs, ys = interpolate(df, profile)
-        normalised_ys = normalise(xs, ys)
-
-        # find the two values where the normalised y = 0.5
-        half = int(len(normalised_ys) * 0.5)
-
-        first_half = np.asarray(normalised_ys[0:half])
-        index_1 = (np.abs(first_half - 0.5)).argmin()
-
-        second_half = np.asarray(normalised_ys[half:len(normalised_ys)])
-        index_2 = half + (np.abs(second_half - 0.5)).argmin()
-
-        # distance is the difference on the corresponding x axis
-        distance = xs[index_2] - xs[index_1]
-
-        # finding where second derivtive is 0 could be more accurate?
-        # inflection at f"=0
-        # but how to find derivative of a list?
-
-        return distance
-
-    def plot(self, inline):
-        """ Plot the interpolated, normalised profiles and the ratio between them """
-        # inline is first entry
-        if inline is True:
-            df = self.df_list[0]
-            profile = self.profile_list[0]
-            title = "Inline"
-        else:
-            df = self.df_list[1]
-            profile = self.profile_list[1]
-            title = "Crossline"
-
-        new_xs, new_ys = interpolate(df, profile)
-        x_axis = new_xs
-        y_axis = normalise(new_xs, new_ys)
-        norm_profile = normalise(new_xs, profile)
-        ratio = []
-        # the ratio is the normalised dose from water phantom / pixel value from EPID profile
-        for i in range(len(x_axis)):
-            ratio.append(y_axis[i] / norm_profile[i])
-
-        plt.plot(x_axis, y_axis, label="Water Phantom")
-        plt.plot(x_axis, norm_profile, label="EPID Profile")
-        plt.plot(x_axis, ratio, label="Ratio Dose/Pixel")
-        plt.xlabel("Distance (cm)")
-        plt.ylabel("Normalised Dose")
-        plt.title(title)
-        plt.legend()
-        plt.show()
-
-    def dose_matrix(self):
-        """ Construct the matrix of dose ratios """
-
-        # define the profiles
-        profile_x = self.profile_list[0]
-        profile_y = self.profile_list[1]
-
-        # get the inline and crossline data, interpolate and normalise
-        inline_df = self.df_list[0]
-        crossline_df = self.df_list[1]
-
-        # get the normalised profiles and doses
-        # inline
-        new_xs, new_ys = interpolate(inline_df, profile_x)
-        inline_dose = normalise(new_xs, new_ys)
-        norm_profile_x = normalise(new_xs, profile_x)
-
-        # crossline
-        new_xs, new_ys = interpolate(crossline_df, profile_y)
-        crossline_dose = normalise(new_xs, new_ys)
-        norm_profile_y = normalise(new_xs, profile_y)
-
-        # initialise empty array = size of image
-        dose_matrix = np.empty((len(norm_profile_x), len(norm_profile_y)), dtype=float)
-
-        # get centre value
-        x, y = self.centre
-
-        # enter the ratio: normalised doses / normalised profile along the central axis
-        # using central axis = centre of field
-        for i in range(len(norm_profile_x)):
-            dose_matrix[x, i] = inline_dose[i] / norm_profile_x[i]
-
-        for j in range(len(norm_profile_y)):
-            dose_matrix[j, y] = crossline_dose[j] / norm_profile_y[j]
-
-        # set all values in the matrix to the product of corresponding dose ratios
-        # needs to be relative to the centre of the field which may not be the centre of the matrix
-        # in this way we're mapping to the field centre of the image
-        for n in range(len(profile_x)):
-            for m in range(len(profile_y)):
-                if n != x and m != y:
-                    dose_matrix[n, m] = dose_matrix[n][y] * dose_matrix[x][m]
-
-        return dose_matrix
-
-
-class SNC:
-
-    """ Class for dealing with files exported from SNC i.e. water phantom"""
+class Calibrate:
+    """ Class to calibrate the water phantom images to the MPC EPID images """
 
     def __init__(self):
-        """ Define folder in which the SNC text files are stored"""
-        pass
+        self.snc_dir = os.path.join(os.getcwd(), "Calibration_Data")
+        self. mpc_dir = os.path.join(os.getcwd(), "Calibration_Data")
 
-    def read_dose_tables():
+    def snc_data(self):
         """Read the dose tables from the MPC snctxt files stored in calibration data folder"""
 
         # declare variables
-        _6x_inline  = []
+        _6x_inline = []
         _6x_crossline = []
         _10x_inline = []
-        _10x_crossline =[]
-        _10fff_inline =[]
-        _10fff_crossline =[]
+        _10x_crossline = []
+        _10fff_inline = []
+        _10fff_crossline = []
 
         # loop through directory
-        directory = os.path.join(os.getcwd(), "Calibration_Data")
+        directory = self.snc_dir
 
         for file in os.listdir(directory):
             if file.endswith('snctxt'):
@@ -511,209 +401,307 @@ class SNC:
                 if filename.find("inline") != -1:
                     # inline uses y measurements
                     data = [df['Y (cm)'], df['Relative Dose (%)']]
-                    inline=1 # 1 for true
+                    inline = 1  # 1 for true
                 if filename.find("crossline") != -1:
                     # crossline uses x measurements
                     data = [df['X (cm)'], df['Relative Dose (%)']]
 
                 # determine the beam energy
                 if filename.find("10fff") != -1:
-                    if inline==1:
+                    if inline == 1:
                         _10fff_inline = data
                     else:
                         _10fff_crossline = data
 
                 if filename.find("10x") != -1:
-                    if inline==1:
+                    if inline == 1:
                         _10x_inline = data
                     else:
                         _10x_crossline = data
 
                 if filename.find("6x") != -1:
-                    if inline==1:
+                    if inline == 1:
                         _6x_inline = data
                     else:
                         _6x_crossline = data
 
         dataset = [_6x_inline, _6x_crossline,
-                    _10x_inline, _10x_crossline,
-                    _10fff_inline, _10fff_crossline]
+                   _10x_inline, _10x_crossline,
+                   _10fff_inline, _10fff_crossline]
 
         return dataset
 
+    def mpc_data(self):
+        # loop through images in directory
+        directory = self.mpc_dir
 
-def run_calibration():
-    # run the above classes
-    # get the water phantom data
-    [_6x_inline, _6x_crossline,
-     _10x_inline, _10x_crossline,
-     _10fff_inline, _10fff_crossline] = SNC.read_dose_tables()
+        for file in os.listdir(directory):
+            if file.endswith(".png") or file.endswith(".jpeg"):
+                filename = os.path.join(directory, file)
+                # read image
+                img = Image(filename)
+                # get the centre of the field
+                centre = img.get_centre()
+                # get the central profiles
+                profile_x, profile_y = img.central_profiles()
 
-    # get the EPID imager data from the MPC
+                # find out which energy it is and create object for each energy
+                if filename.find("6x") != -1:
+                    _6x_mpc = profile_x, profile_y, centre
+                if filename.find("10x") != -1:
+                    _10x_mpc = profile_x, profile_y, centre
+                if filename.find("10fff") != -1:
+                    _10fff_mpc = profile_x, profile_y, centre
 
-    # Get the directory where the XIM converted images are stored
-    directory = os.path.join(os.getcwd(), "Calibration_Data")
+        return _6x_mpc, _10x_mpc, _10fff_mpc
 
-    # loop through images in directory
-    for file in os.listdir(directory):
-        if file.endswith(".png") or file.endswith(".jpeg"):
-            filename = os.path.join(directory, file)
-            # read image
-            img0 = Image(filename)
-            # detect edges
-            img = Edges.sobel_edges(img0)
-            # from the centre take x,y profiles in the original image
-            x, y = Profiles(img, [300, 900], [300, 900]).get_centre()
-            centre = int(x), int(y)
+    def centre(self, energy):
+        """ return the centre of the original 6x mpc epid image """
+        _6x_mpc, _10x_mpc, _10fff_mpc = self.mpc_data()
+        if energy == "6x":
+            centre = _6x_mpc[2]
+        if energy == "10x":
+            centre = _10x_mpc[2]
+        if energy == "10fff":
+            centre = _10fff_mpc[2]
+        return centre
 
-            # find out which energy it is and create object for each energy
-            if filename.find("6x") != -1:
-                _6x_central_profiles = Profiles(img0.gray(), [centre[0]], [centre[1]])
-                _6x_sobel = Profiles(img, [300, 900], [300, 900])
-                _6x_img = img0.gray()
-                profile_x, profile_y = _6x_central_profiles.filter()
-                # set an object which matches the water phantom and epid data for _6x energy
-                _6x_mapping = Transform([_6x_inline, _6x_crossline], [profile_x[0], profile_y[0]], centre)
-                # get the transform matrix
-                _6x_matrix = _6x_mapping.dose_matrix()
+    def calibration_arrays(self, snc, mpc):
+        """ Construct the matrix of dose ratios """
+        # input: snc: a dataframe of inline and crossline dose from the water tank
+        # mpc: central x, y profiles and the centre of the field, format profile x, profile y, centre
 
-            if filename.find("10x") != -1:
-                _10x_central_profiles = Profiles(img0.gray(), [centre[0]], [centre[1]])
-                _10x_sobel = Profiles(img, [300, 900], [300, 900])
-                _10x_img = img0.gray()
-                profile_x, profile_y = _10x_central_profiles.filter()
-                _10x_mapping = Transform([_10x_inline, _10x_crossline], [profile_x[0], profile_y[0]], centre)
-                # get the transform matrix
-                _10x_matrix = _10x_mapping.dose_matrix()
+        # define the profiles
+        profile_x = mpc[0]
+        profile_y = mpc[1]
+        centre = mpc[2]
 
-            if filename.find("10fff") != -1:
-                _10fff_central_profiles = Profiles(img0.gray(), [centre[0]], [centre[1]])
-                _10fff_sobel = Profiles(img, [300, 900], [300, 900])
-                _10fff_img = img0.gray()
-                profile_x, profile_y = _10fff_central_profiles.filter()
-                _10fff_mapping = Transform([_10fff_inline, _10fff_crossline], [profile_x[0], profile_y[0]], centre)
-                # get the transform matrix
-                _10fff_matrix = _10fff_mapping.dose_matrix()
+        # get the inline and crossline data, interpolate and normalise
+        inline_df = snc[0]
+        crossline_df = snc[1]
 
-    return _6x_matrix, _10x_matrix, _10fff_matrix, _6x_sobel, _10x_sobel, _10fff_sobel
+        # get the normalised profiles and doses
+        # inline is y
+        new_xs, new_ys = interpolate(inline_df, profile_y)
+        inline_dose = normalise(new_xs, new_ys)
+        norm_profile_y = normalise(new_xs, profile_y)
+
+        # crossline is x
+        new_xs, new_ys = interpolate(crossline_df, profile_x)
+        crossline_dose = normalise(new_xs, new_ys)
+        norm_profile_x = normalise(new_xs, profile_x)
+
+        # initialise 2 empty calibration lists
+        calibration_x = []
+        calibration_y = []
+        # enter the ratio: water tank dose / EPID MPC pixel value
+        for i in range(0, len(norm_profile_x), 1):
+            calibration_x.append(crossline_dose[i] / norm_profile_x[i])
+        for i in range(0, len(norm_profile_y), 1):
+            calibration_y.append(inline_dose[i] / norm_profile_y[i])
+
+        return calibration_x, calibration_y
+
+    def get_calibrations(self):
+        """ Get the calibration matrix for each beam energy """
+        # get the mpc and snc data
+        _6x_mpc, _10x_mpc, _10fff_mpc = self.mpc_data()
+        [_6x_inline, _6x_crossline,
+         _10x_inline, _10x_crossline,
+         _10fff_inline, _10fff_crossline] = self.snc_data()
+
+        # run the matrix function for each energy
+        _6x_cal = self.calibration_arrays([_6x_inline, _6x_crossline], _6x_mpc)
+        _10x_cal = self.calibration_arrays([_10x_inline, _10x_crossline], _10x_mpc)
+        _10fff_cal = self.calibration_arrays([_10fff_inline, _10fff_crossline], _10fff_mpc)
+
+        return _6x_cal, _10x_cal, _10fff_cal
+
+    def energy_6x(self):
+        """ Return _6x calibration arrays """
+        _6x_cal, _10x_cal, _10fff_cal = self.get_calibrations()
+        return _6x_cal
+
+    def energy_10x(self):
+        """ Return 10x calibration arrays """
+        _6x_cal, _10x_cal, _10fff_cal = self.get_calibrations()
+        return _10x_cal
+
+    def energy_10fff(self):
+        """ Return 10fff calibration arrays """
+        _6x_cal, _10x_cal, _10fff_cal = self.get_calibrations()
+        return _10fff_cal
+
+    def plot(self, energy):
+        """ Plot the water tank and EPID profiles and the calibration ratio between them
+            Input: energy as 6x, 10x or 10fff """
+
+        # get the data
+        _6x_mpc, _10x_mpc, _10fff_mpc = self.mpc_data()
+        [_6x_inline, _6x_crossline,
+         _10x_inline, _10x_crossline,
+         _10fff_inline, _10fff_crossline] = self.snc_data()
+
+        if energy == "6x":
+            # get the calibration ratio for 6x
+            cal_x, cal_y = self.energy_6x()
+            # interpolate and normalise the uncalibrated mpc and snc data
+            profile_x, profile_y, centre = _6x_mpc
+            new_xs, new_ys = interpolate(_6x_crossline, profile_x)
+            crossline_y_axis = normalise(new_xs, new_ys)
+            crossline_x_axis = new_xs
+            norm_profile_x = normalise(new_xs, profile_x)
+
+            new_xs, new_ys = interpolate(_6x_inline, profile_y)
+            inline_y_axis = normalise(new_xs, new_ys)
+            inline_x_axis = new_xs
+            norm_profile_y = normalise(new_xs, profile_y)
+            # set the title
+            title = "6x"
+
+        if energy == "10x":
+            # get the calibration ratio for 6x
+            cal_x, cal_y = self.energy_10x()
+            # interpolate and normalise the uncalibrated mpc and snc data
+            profile_x, profile_y, centre = _10x_mpc
+            new_xs, new_ys = interpolate(_6x_crossline, profile_x)
+            crossline_y_axis = normalise(new_xs, new_ys)
+            crossline_x_axis = new_xs
+            norm_profile_x = normalise(new_xs, profile_x)
+
+            new_xs, new_ys = interpolate(_6x_inline, profile_y)
+            inline_y_axis = normalise(new_xs, new_ys)
+            inline_x_axis = new_xs
+            norm_profile_y = normalise(new_xs, profile_y)
+            # set the title
+            title = "10x"
+
+        if energy == "10fff":
+            # get the calibration ratio for 6x
+            cal_x, cal_y = self.energy_10fff()
+            # interpolate and normalise the uncalibrated mpc and snc data
+            profile_x, profile_y, centre = _10fff_mpc
+            new_xs, new_ys = interpolate(_6x_crossline, profile_x)
+            crossline_y_axis = normalise(new_xs, new_ys)
+            crossline_x_axis = new_xs
+            norm_profile_x = normalise(new_xs, profile_x)
+
+            new_xs, new_ys = interpolate(_6x_inline, profile_y)
+            inline_y_axis = normalise(new_xs, new_ys)
+            inline_x_axis = new_xs
+            norm_profile_y = normalise(new_xs, profile_y)
+            # set the title
+            title = "10FFF"
+
+        plt.plot(crossline_x_axis, crossline_y_axis, label="Water Phantom")
+        plt.plot(crossline_x_axis, norm_profile_x, label="EPID Profile")
+        plt.plot(crossline_x_axis, cal_x, label="Calibration Ratio Dose/Pixel")
+        plt.xlabel("Distance (cm)")
+        plt.ylabel("Normalised Dose")
+        crossline_title = str(title + "  : Crossline")
+        plt.title(crossline_title)
+        plt.legend()
+        plt.show()
+
+        plt.plot(inline_x_axis, inline_y_axis, label="Water Phantom")
+        plt.plot(inline_x_axis, norm_profile_y, label="EPID Profile")
+        plt.plot(inline_x_axis, cal_y, label="Calibration Ratio Dose/Pixel")
+        plt.xlabel("Distance (cm)")
+        plt.ylabel("Normalised Dose")
+        inline_title = str(title + "  : Inline")
+        plt.title(inline_title)
+        plt.legend()
+        plt.show()
 
 
-class TransformView:
-    """ Class to apply the transformation matrices onto new images """
+class NewImages:
+    """ Class for processing newly acquired MPC EPID images """
 
     def __init__(self, energy, filename):
-        """ Energy is which beam we are transforming, 6x, 10x, or 10xfff,
-         filename is the newly uploaded image """
         self.energy = energy
         self.filename = filename
 
-    def get_matrix(self):
-        """ Extract the calibration matrix for the corresponding beam energy """
-        _6x_matrix, _10x_matrix, _10fff_matrix, _6x_sobel, _10x_sobel, _10fff_sobel = run_calibration()
+    def apply_calibration(self):
+        """ Apply the calibration to the new image """
+        cal = Calibrate()
+
         if self.energy == "6x":
-            matrix = _6x_matrix
+            cal_x, cal_y = cal.energy_6x()
         if self.energy == "10x":
-            matrix = _10x_matrix
+            cal_x, cal_y = cal.energy_10x()
         if self.energy == "10fff":
-            matrix = _10fff_matrix
+            cal_x, cal_y = cal.energy_10fff()
 
-        return matrix
+        profile_x, profile_y = Image(self.filename).central_profiles()
+        new_centre = Image(self.filename).get_centre()
+        # normalise, shift to centre, convert to distance
+        x_array_x, normalised_x = process_profile(profile_x, new_centre[0])
+        x_array_y, normalised_y = process_profile(profile_y, new_centre[1])
+        transformed_x = []
+        transformed_y = []
+        for i in range(len(cal_x)):
+            transformed_x.append(cal_x[i] * normalised_x[i])
+        for i in range(len(cal_y)):
+            transformed_y.append(cal_y[i] * normalised_y[i])
 
-    def get_original_centre(self):
-        """ Find centre of field in calibration image """
-        _6x_matrix, _10x_matrix, _10fff_matrix, _6x_sobel, _10x_sobel, _10fff_sobel = run_calibration()
+        return [x_array_x, transformed_x],\
+               [x_array_y, transformed_y]
+
+    def centre_shift(self):
+        """ Get the centre shift in distance """
+        new_centre = Image(self.filename).get_centre()
+        cal = Calibrate()
         if self.energy == "6x":
-            centre = _6x_sobel.get_centre()
+            original_centre = cal.centre(energy="6x")
         if self.energy == "10x":
-            centre = _10x_sobel.get_centre()
+            original_centre = cal.centre(energy="10x")
         if self.energy == "10fff":
-            centre = _10x_sobel.get_centre()
+            original_centre = cal.centre(energy="10fff")
+        shift = (distance.euclidean(new_centre, original_centre)) * 0.336
+        # convert to distance
+        return shift
 
-        return centre
+    def symmetry(self, transformed):
+        """ Return the symmetry of the new image """
+        if transformed is True:
+            # use the transformed data, once the calibration has been applied
+            crossline, inline = self.apply_calibration()
+            crossline_symm = symmetry(crossline[0], crossline[1])
+            inline_symm = symmetry(inline[0], inline[1])
+        else:
+            # use the raw data before applying calibration
+            profile_x, profile_y = Image(self.filename).central_profiles()
+            new_centre = Image(self.filename).get_centre()
+            # normalise, shift to centre, convert to distance
+            x_array_x, normalised_x = process_profile(profile_x, new_centre[0])
+            x_array_y, normalised_y = process_profile(profile_y, new_centre[1])
+            crossline_symm = symmetry(x_array_x, normalised_x)
+            inline_symm = symmetry(x_array_y, normalised_y)
 
-    def process_profile(self, profile, centre_cood):
-        """ Input: profile = x or y profile; centre_cood = corresponding x or y central co-ordinate
-            Output: the shifted (w.r.t. centre) and normalised arrays, measured in distance """
-        # this just puts the plot symmetric about 0 and normalised and in distance
+        return crossline_symm, inline_symm
 
-        # shift it to be centred at 0 and convert to cm, using MPC EPID resolution
-        xs = np.linspace(0, len(profile), len(profile))
-        shifted_xs = [(x - int(centre_cood)) * 0.0336 for x in xs]
-        # normalise profile
-        normalised_array = normalise(shifted_xs, profile)
+    def flatness(self, transformed):
+        """ Return the flatness of the new image """
+        if transformed is True:
+            crossline, inline = self.apply_calibration()
+            crossline_flat = flatness(crossline[0], crossline[1])
+            inline_flat = flatness(inline[0], inline[1])
 
-        return shifted_xs, normalised_array
+        else:
+            # use the raw data before applying calibration
+            profile_x, profile_y = Image(self.filename).central_profiles()
+            new_centre = Image(self.filename).get_centre()
+            # normalise, shift to centre, convert to distance
+            x_array_x, normalised_x = process_profile(profile_x, new_centre[0])
+            x_array_y, normalised_y = process_profile(profile_y, new_centre[1])
+            crossline_flat = flatness(x_array_x, normalised_x)
+            inline_flat = flatness(x_array_y, normalised_y)
 
-    def transform(self):
-        """ Apply the calibration to the new image and return the transformed matrix,
-         flatness and symmetry """
-
-        # apply transformation matrix and plot
-
-        # get central profiles of newly uploaded image
-        img0 = Image(self.filename)
-        image_sobel = Edges.sobel_edges(img0)
-        # find centre
-        new_centre = Profiles(image_sobel, [300, 900], [300, 900]).get_centre()
-        # filter profiles
-        central_profiles = Profiles(img0.gray(), [int(new_centre[0])], [int(new_centre[1])])
-        profile_x, profile_y = central_profiles.filter()
-
-        # normalise, shift, convert to distance
-        x_array_x, normalised_array_x = self.process_profile(profile_x[0], new_centre[0])
-        x_array_y, normalised_array_y = self.process_profile(profile_y[0], new_centre[1])
-
-        # get calibration matrix
-        transformation = self.get_matrix()
-        # get centre of field matrix
-        matrix_centre = self.get_original_centre()
-
-        # multiply the central profiles by the matrix
-        # corresponding to the centre
-        transformed_profile_x = []
-        for x in range(len(normalised_array_x)):
-            transformed_profile_x.append(normalised_array_x[x] * transformation[int(matrix_centre[0])][x])
-
-        transformed_profile_y = []
-        for x in range(len(normalised_array_y)):
-            transformed_profile_y.append(normalised_array_y[x] * transformation[x][int(matrix_centre[1])])
-
-        symmetry_x = symmetry(x_array_x, transformed_profile_x)
-        symmetry_y = symmetry(x_array_y, transformed_profile_y)
-
-        flatness_x = flatness(x_array_x, transformed_profile_x)
-        flatness_y = flatness(x_array_y, transformed_profile_y)
-
-        return [x_array_x, transformed_profile_x, symmetry_x, flatness_x], \
-               [x_array_y, transformed_profile_y, symmetry_y, flatness_y]
-
-    def untransformed_data(self):
-        """ Returns symmetry and flatness of the newly generated EPID MPC image
-        without applying the calibration to water tank"""
-        # get central profiles of newly uploaded image
-        img0 = Image(self.filename)
-        image_sobel = Edges.sobel_edges(img0)
-        # find centre
-        new_centre = Profiles(image_sobel, [300, 900], [300, 900]).get_centre()
-        # filter profiles
-        central_profiles = Profiles(img0.gray(), [int(new_centre[0])], [int(new_centre[1])])
-        profile_x, profile_y = central_profiles.filter()
-
-        # normalise, shift, convert to distance
-        x_array_x, normalised_array_x = self.process_profile(profile_x[0], new_centre[0])
-        x_array_y, normalised_array_y = self.process_profile(profile_y[0], new_centre[1])
-
-        symmetry_x = symmetry(x_array_x, normalised_array_x)
-        symmetry_y = symmetry(x_array_y, normalised_array_y)
-
-        flatness_x = flatness(x_array_x, normalised_array_x)
-        flatness_y = flatness(x_array_y, normalised_array_y)
-
-        return [symmetry_x, flatness_x], \
-               [symmetry_y, flatness_y]
+        return crossline_flat, inline_flat
 
 
 
+#img = NewImages(energy="6x",filename=r"C:\Users\NCompton\PycharmProjects\ImageAnalysis\XIMdata\6x_BeamProfileCheck.png")
 
 
 
