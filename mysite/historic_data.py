@@ -5,7 +5,7 @@ sensitivity, specificity, reliability
 The reason it will only run locally is that Aria image is password protected """
 
 # import modules
-from beam_profile_check import run_calibration, main
+from beam_profile_check import main
 import os
 import shutil
 import datetime
@@ -66,31 +66,31 @@ for folder in os.listdir(dir):
                 for new_file in os.listdir(xim_directory):
                     if new_file.endswith(".png") or new_file.endswith(".jpeg"):
                         image_file = os.path.join(xim_directory, new_file)
-                        # apply the transformation matrix for the beam energy
-                        # this needs changing to include taking the average of +/-10 pixel rows
-                        # average from the profiles adjacent to centre
-                        # but is that assuming the adajcent 10 are the centre and then applying calibration
-                        # or applying the transformation matrix and then taking avergae?
-                        inline, crossline = main.TransformView("6x", image_file).transform()
-                        # structure of inline and crossline = [x, y, symmetry, flatness]
-                        raw_inline, raw_crossline = main.TransformView("6x", image_file).untransformed_data()
-                        # take the symmetry and flatness before applying the calibration matrix
+                        # apply the calibration for the beam energy
+
+                        obj = main.NewImages("6x", image_file)
+                        crossline, inline = obj.apply_calibration()
+                        crossline_symm, inline_symm = obj.symmetry(transformed=True)
+                        crossline_flat, inline_flat = obj.flatness(transformed=True)
+                        centre_shift = obj.centre_shift()
                         # enter into database
-                        cursor.execute("EXEC Insert_Symm_Flat_Data ?,?,?,?,?", [mpc_event_id, 1, 0, raw_inline[0], raw_inline[1]])
+                        cursor.execute("EXEC Insert_Symm_Flat_Data ?,?,?,?,?", [mpc_event_id, 1, 1, inline_symm, inline_flat])
                         cursor.commit()
                         # repeat for crossline
-
-                        # enter into database
-                        cursor.execute("EXEC Insert_Symm_Flat_Data ?,?,?,?,?", [mpc_event_id, 0, 0, raw_crossline[0], raw_crossline[1]])
+                        cursor.execute("EXEC Insert_Symm_Flat_Data ?,?,?,?,?", [mpc_event_id, 0, 1, crossline_symm, crossline_flat])
                         cursor.commit()
 
-                        # enter date and beam energy to database
+                        # repeat for untransformed data, before calibration applied
                         # 1 for inline
                         # 1 for transformed
-                        cursor.execute("EXEC Insert_Symm_Flat_Data ?,?,?,?,?", [mpc_event_id, 1, 1, inline[2], inline[3]])
+                        crossline_symm, inline_symm = obj.symmetry(transformed=False)
+                        crossline_flat, inline_flat = obj.flatness(transformed=False)
+                        cursor.execute("EXEC Insert_Symm_Flat_Data ?,?,?,?,?",
+                                       [mpc_event_id, 1, 0, inline_symm, inline_flat])
                         cursor.commit()
                         # repeat for crossline
-                        cursor.execute("EXEC Insert_Symm_Flat_Data ?,?,?,?,?", [mpc_event_id, 0, 1, crossline[2], crossline[3]])
+                        cursor.execute("EXEC Insert_Symm_Flat_Data ?,?,?,?,?",
+                                       [mpc_event_id, 0, 0, crossline_symm, crossline_flat])
                         cursor.commit()
 
 
@@ -106,12 +106,12 @@ for folder in os.listdir(dir):
                     name = str(line[0])
                     if name.find("BeamOutputChange") != -1:
                         # test_id = 1
-                        cursor.execute("EXEC Insert_MPC_Results ?,?,?", [mpc_event_id, 1, line[1]])
+                        cursor.execute("EXEC Insert_MPC_Output_Change_Data ?,?", [mpc_event_id, line[1]])
                     if name.find("BeamUniformityChange") != -1:
-                        cursor.execute("EXEC Insert_MPC_Results ?,?,?", [mpc_event_id, 2, line[1]])
+                        cursor.execute("EXEC Insert_Uniformity_Change_Data ?,?", [mpc_event_id, line[1]])
                         # test id = 2
                     if name.find("BeamCenterShift") != -1:
-                        cursor.execute("EXEC Insert_MPC_Results ?,?,?", [mpc_event_id, 3, line[1]])
+                        cursor.execute("EXEC Insert_Beam_Center_Shift_Data ?,?,?", [mpc_event_id, line[1], centre_shift])
                         # test id = 3
                     cursor.commit()
 
