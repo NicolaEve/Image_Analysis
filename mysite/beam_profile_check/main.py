@@ -701,10 +701,6 @@ class NewImages:
 
 
 
-#img = NewImages(energy="6x",filename=r"C:\Users\NCompton\PycharmProjects\ImageAnalysis\XIMdata\6x_BeamProfileCheck.png")
-
-
-
 
 
 

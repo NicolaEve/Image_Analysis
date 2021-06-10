@@ -12,6 +12,7 @@ Contact: nicola.compton@ulh.nhs.uk
 from django.test import TestCase
 
 import unittest
+
 from .main import *
 import numpy as np
 import matplotlib
@@ -31,91 +32,10 @@ image_test_dir = os.path.join(os.getcwd(), "Images_for_tests")
 # import test images
 file_colour = os.path.join(image_test_dir, "Test_image_colour.png")
 file_sobel = os.path.join(image_test_dir, "test_image_sobel.png")
-
-
-class ImageTests(unittest.TestCase):
-    """ Class to test the functionality of the image processing functions """
-
-    def setUp(self):
-        """Run prior to each test."""
-        self.colour = Image(file_colour)
-        self.sobel = Image(file_sobel)
-
-    def test_sobel_equal(self):
-        """Test that the Sobel edge detection function returns edges"""
-        # save image as a .png so it can be tested using matplotlib compare
-        out_img = Edges.sobel_edges(self.colour)
-        global out_file
-        out_file = os.path.join(image_test_dir, "output_image.png")
-        cv2.imwrite(out_file, out_img)
-        # test that they are equal, tolerance is 40 - bit iffy
-        out = matplotlib.testing.compare.compare_images(out_file, file_sobel, 40, in_decorator=True)
-        if str(out) != 'None':
-            raise Exception('Edge detection using Sobel operator failed')
-
-    def test_sobel_unequal(self):
-        """Test the images are not equal"""
-        out = matplotlib.testing.compare.compare_images(out_file, file_colour, 40)
-        if str(out) == 'None':
-            raise Exception('Sobel operator has not altered the image')
-        # should compare_images raise the exception?
-
-    def tearDown(self):
-        """Run post each test."""
-        pass
-
-
-class ProfileTests(unittest.TestCase):
-    """ Class to test the functionality of the profile processing functions """
-
-    def setUp(self):
-        """Run prior to each test."""
-        image = np.array([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-                        [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]) # test array image
-        self.profile = Profiles(image, [1], [1]) # test along these axis
-
-    def test_get_profiles(self):
-        """ Test that it retrieves the correct profiles """
-        x_profile, y_profile = self.profile.get_profiles()
-        np.testing.assert_array_equal(x_profile, np.array([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]))
-        np.testing.assert_array_equal(y_profile, np.array([[2, 2, 2]]))
-
-    def tearDown(self):
-        """Run post each test."""
-        pass
-
-
-class TransformTests(unittest.TestCase):
-    """ Class tp test the functionality of the matrix transforms """
-
-    def setUp(self):
-        """Run prior to each test."""
-        # set the test variables
-        image = np.array([[1,2,3,4,5,6,7,8,9,10],
-                        [1,2,3,4,5,6,7,8,9,10],
-                        [1,2,3,4,5,6,7,8,9,10]])
-        inline = [[-2,-1,0,1,2], [30,20,10,20,30]]
-        crossline = [[-2,-1,0,1,2], [50,30,10,30,50]]
-        df_list = [inline, crossline]
-        profile_list = [[1,1,1,1,1], [1,1,1,1,1]]
-        centre = 2, 2
-
-        self.transform = Transform(df_list, profile_list, centre)
-
-    def test_dose_matrix(self):
-        """ Test the dose matrix function returns the correct ratios """
-        dose_matrix = self.transform.dose_matrix()
-        output = np.array([[15, 10, 5, 10, 15],
-                          [9, 6, 3, 6, 9],
-                          [3, 2, 1, 2, 3],
-                          [9, 6, 3, 6, 9],
-                          [15, 10, 5, 10, 15]])
-        np.testing.assert_array_equal(dose_matrix, output)
-
-    def tearDown(self):
-        """Run post each test."""
-        pass
+calibration_folder = os.path.join(os.getcwd(), "Calibration_Data")
+file_original_6x = os.path.join(calibration_folder, "6x_BeamProfileCheck.png")
+file_original_10x = os.path.join(calibration_folder, "10x_BeamProfileCheck.png")
+file_original_10fff = os.path.join(calibration_folder, "10fff_BeamProfileCheck.png")
 
 
 class StaticTests(unittest.TestCase):
@@ -231,22 +151,44 @@ class StaticTests(unittest.TestCase):
         pass
 
 
-class FieldTests(unittest.TestCase):
-    """ Check field size calculated correctly and matches """
+class ImageTests(unittest.TestCase):
+    """ Class to test the functionality of the image processing functions """
 
     def setUp(self):
-        """ Run prior to every test """
+        """Run prior to each test."""
+        self.colour = Image(file_colour)
+        self.sobel = Image(file_sobel)
+        self.original_6x = NewImages("6x", file_original_6x)
+        self.original_10x = NewImages("10x", file_original_10x)
+        self.original_10fff = NewImages("10fff", file_original_10fff)
 
-        # set the image
-        image = np.random.randint(1, 50, size=(100, 100))
-        image[10, :] = 100
-        image[90, :] = 100
-        image[:, 10] = 100
-        image[:, 90] = 100
+    def test_sobel_equal(self):
+        """Test that the Sobel edge detection function returns edges"""
+        # save image as a .png so it can be tested using matplotlib compare
+        out_img = self.colour.sobel()
+        global out_file
+        out_file = os.path.join(image_test_dir, "output_image.png")
+        cv2.imwrite(out_file, out_img)
+        # test that they are equal, tolerance is 40 - bit iffy
+        out = matplotlib.testing.compare.compare_images(out_file, file_sobel, 40, in_decorator=True)
+        if str(out) != 'None':
+            raise Exception('Edge detection using Sobel operator failed')
 
-        profiles = [30, 70]
+    def test_sobel_unequal(self):
+        """Test the images are not equal"""
+        out = matplotlib.testing.compare.compare_images(out_file, file_colour, 40)
+        if str(out) == 'None':
+            raise Exception('Sobel operator has not altered the image')
+        # should compare_images raise the exception?
 
-        self.sobel_profile = Profiles(image, profiles, profiles)
+    def test_noisy_profiles(self):
+        """ Test that it retrieves the correct profiles """
+        image = np.array([[1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                          [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+                          [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]])  # test array image
+        x_profile, y_profile = self.sobel.noisy_profiles(image, 1, 1)
+        np.testing.assert_array_equal(x_profile, np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]))
+        np.testing.assert_array_equal(y_profile, np.array([2, 2, 2]))
 
     def test_get_max_peaks(self):
         """ Test it finds the position and values of the peaks """
@@ -259,14 +201,83 @@ class FieldTests(unittest.TestCase):
 
         # function usually accepts lists
         array_list = [y1, y1]
-        positions, max_values = self.sobel_profile.get_max_peaks(array_list)
+        positions, max_values = self.sobel.get_max_peaks(array_list)
 
         # negative squared function has max value at -0, positioned in centre
         self.assertListEqual(positions, [(50,), (50,)])
         self.assertListEqual(max_values, [(-0,), (-0,)])
 
+    def test_centre_shift(self):
+        """ Test that the centre shift is 0 for the original images """
+        shift = self.original_6x.centre_shift()
+        self.assertEqual(shift, 0)
+
+        shift = self.original_10x.centre_shift()
+        self.assertEqual(shift, 0)
+
+        shift = self.original_10fff.centre_shift()
+        self.assertEqual(shift, 0)
+
     def tearDown(self):
         """Run post each test."""
+        pass
+
+
+class CalibrateTests(unittest.TestCase):
+    """ Class to test the calibrate class """
+
+    def setUp(self):
+        """ Run prior to each test """
+        self.cal = Calibrate()
+
+    def test_directories(self):
+        """ Test the directories where mpc and snc calibration data stored is filled correctly """
+        dir = os.path.join(os.getcwd(), "Calibration_Data")
+        # check the directory is the same
+        self.assertEqual(str(dir), self.cal.mpc_dir)
+        self.assertEqual(str(dir), self.cal.snc_dir)
+        # loop through files and store the extension in a list
+        ext = []
+        for file in os.listdir(dir):
+            ext.append(os.path.splitext(file)[-1].lower())
+        # count number of files which each extension
+        snctxt = ext.count(".snctxt")
+        png = ext.count(".png")
+        xim = ext.count(".xim")
+
+        # test correct amount of each type
+        self.assertEqual(snctxt, 6)
+        self.assertEqual(png, 3)
+        self.assertEqual(xim, 3)
+
+        # test these are the only files in the directory
+        self.assertEqual(len(ext), 12)
+
+    def test_media_directory(self):
+        """ Test the media directory is deleting files after use """
+        dir = os.path.join(os.getcwd(), "media\images")
+
+        # look for the file extensions
+        ext = []
+        for file in os.listdir(dir):
+            ext.append(os.path.splitext(file)[-1].lower())
+        xim = ext.count(".xim")
+        py = ext.count(".py")
+        self.assertEqual(xim, 1)
+        self.assertEqual(py, 1)
+
+        self.assertEqual(len(ext), 3)
+
+        xim_dir = os.path.join(dir, "XIMdata")
+        ext = []
+        for file in os.listdir(xim_dir):
+            ext.append(os.path.splitext(file)[-1].lower())
+        png = ext.count(".png")
+        self.assertEqual(len(ext), 2)
+        self.assertEqual(png, 1)
+
+    def tearDown(self):
+        """ Run post each test """
         pass
 
 
