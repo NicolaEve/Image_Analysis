@@ -83,16 +83,15 @@ class StaticTests(unittest.TestCase):
         profile = [1, 5, 10, 10, 10,
                    10, 10, 10, 10, 10,
                    10, 5, 1]
-        x_array = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+        x_array = [-6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6]
         symm = self.symmetry(x_array, profile)
         self.assertEqual(symm, 0)
 
         profile = [1, 5, 10, 6, 10,
                    10, 1, 10, 10, 10,
                    10, 5, 1]
-        x_array = [0, 1, 2, 3, 4, 5, 0, 7, 8, 9, 10, 11, 12]
         symm = self.symmetry(x_array, profile)
-        self.assertEqual(symm, 90)
+        self.assertEqual(symm, 400)
 
     def test_flatness(self):
         """ Test the flatness function """

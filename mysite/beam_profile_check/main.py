@@ -92,16 +92,18 @@ def symmetry(x_array, transformed_profile):
     field_80, index_lwr = core_80(x_array, transformed_profile)
     # we shifted to 0 by -centre so 0 is centre
     x_array = np.asarray(x_array)
-    index = (np.abs(x_array - 0)).argmin()
+    index_centre = (np.abs(x_array - 0)).argmin()
     # find corresponding index in field_80
-    index_centre = index - index_lwr
+    #index_centre = index - index_lwr
 
     # find the max difference for symmetric pairs
     symm =[]
-    for i in range(int(len(field_80)*0.5)):
+    i = 0
+    while index_centre - i > index_lwr:
+        i = i + 1
         right = index_centre + i
         left = index_centre - i
-        cpd_percentage = 100 * (np.abs((field_80[right] - field_80[left])) / field_80[index_centre])# don't need?
+        cpd_percentage = 100 * (np.abs((transformed_profile[right] - transformed_profile[left])) / transformed_profile[index_centre])
         symm.append(cpd_percentage)
 
     symmetry = max(symm)
