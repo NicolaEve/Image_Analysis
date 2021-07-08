@@ -42,7 +42,7 @@ def historic(energy, filepath):
 
         # get the most recent ones
         # chnage this to get the most recent file that was in the database?
-        cutoff = date > datetime(2021, 3, 1, 12, 17, 9, 29375)
+        cutoff = date > datetime(2021, 6, 15, 12, 17, 9, 29375)
         if cutoff is True:
             statement = """declare @mpc_event_id int;
                                        EXEC @mpc_event_id = Insert_MPC_Event ?,?;
