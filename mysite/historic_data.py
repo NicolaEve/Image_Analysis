@@ -40,9 +40,12 @@ def historic(energy, filepath):
         created = os.stat(xim_file).st_ctime
         date = datetime.fromtimestamp(created)
 
-        # get the most recent ones
+        # get the most recent entry from the database
+        statement = """declare @recent datetime; SELECT MAX(QA_Date) FROM MPC_Event as recent"""
+        cursor.execute(statement)
+        last_date = cursor.fetchval()
         # chnage this to get the most recent file that was in the database?
-        cutoff = date > datetime(2021, 6, 15, 12, 17, 9, 29375)
+        cutoff = date > last_date
         if cutoff is True:
             statement = """declare @mpc_event_id int;
                                        EXEC @mpc_event_id = Insert_MPC_Event ?,?;
