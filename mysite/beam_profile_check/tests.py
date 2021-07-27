@@ -1,6 +1,6 @@
 """
 This script tests the functionality of the app
-To run, cd into mysite and type 'nose2 -v' to the command line
+To run the test suite, cd into mysite and type 'nose2 -v' to the command line
 A coverage report can be generated using nose2 --with-coverage   -vvv
 
 Author: Nicola Compton

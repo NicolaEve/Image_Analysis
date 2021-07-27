@@ -1,10 +1,6 @@
 """
 Models defines the database objects for the app.
 
-This script also contains code for symmetry and flatness metrics.
-
-TransformView class is where the calibration matrix is applied to the newly uploaded image
-
 Author: Nicola Compton
 Date: 24th May 2021
 Contact: nicola.compton@ulh.nhs.uk

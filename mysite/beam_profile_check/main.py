@@ -1,17 +1,9 @@
 """
-Script containing methods used to perform image analysis including the following classes:
-Image: basic image functions, read, guaussian blue, greyscale
-Edges: sobel edge detection of an image
-Profiles: finds peaks, field corners, centre and plot functions
-Transform: functions to calculate matrix of offset dose ratios in order to calibrate water tank doses to MPC profiles
-TransformView: functions to apply the calibration matrix to the newly generated MPC EPID image,
-returning symmetry and flatness metrics
-SNC: reads the data from the water tank snc from 1st April 2021, for calibration
-
 The script maps the beam profile check data from the MPC from 1st April 2021 onto
-corresponding values from the SNC water phantom acquired on 1st April 2021.
-The script generates calibration matrices of dose points mapped to each other
-for each beam energy, with respect to the centre of the field.
+corresponding values from the SNC water phantom acquired on 1st April 2021 in order
+to generate calibration vectors for each beam energy. The calibration vectors are
+applied to newly acquired images from the MPC. Symmetry, flatness and beam centre
+shift are calculated.
 
 Author: Nicola Compton
 Date: 24th May 2021

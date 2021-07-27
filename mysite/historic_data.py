@@ -1,8 +1,6 @@
-""" This script will be run locally to extract the historic data from Aria image
-Analysis using my calibration will be run and compared to MPC results
-Then I can export this data for statistical analysis and reporting on bias,
-sensitivity, specificity, reliability
-The reason it will only run locally is that Aria image is password protected """
+""" Script to be run locally in order to extract historic data from Aria image
+and write the MPC results into a database.
+(The reason for running locally is Aria image is password protected and the database is local) """
 
 # import modules
 from beam_profile_check import main
@@ -44,17 +42,19 @@ def historic(energy, filepath):
         statement = """declare @recent datetime; SELECT MAX(QA_Date) FROM MPC_Event as recent"""
         cursor.execute(statement)
         last_date = cursor.fetchval()
-        # chnage this to get the most recent file that was in the database?
+
+        # only extract data from files which have not already been written into the database
         cutoff = date > last_date
         if cutoff is True:
+
+            # enter date and beam energy to database
+            # return the mpc event id
             statement = """declare @mpc_event_id int;
                                        EXEC @mpc_event_id = Insert_MPC_Event ?,?;
                                        SELECT @mpc_event_id as mpc_event_id; """
             cursor.execute(statement, [energy, date])
             mpc_event_id = cursor.fetchval()
             cursor.commit()
-            # enter date and beam energy to database
-            # return the mpc event id
 
             # extract the data from the xim file
             # convert xim to png, first copy the file into the media directory
