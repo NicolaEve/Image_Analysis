@@ -20,7 +20,9 @@ env\Scripts\activate
 run the server with the command
 python manage.py runserver
 
-In the web browser, navigate to 
+In the web browser, navigate to the local host, http://127.0.0.1:8000/ and upload the corresponding image and click submit.
+
+Alternatively, navigate to
 localhost/6x,
 localhost/10x, or
 localhost/10fff 
