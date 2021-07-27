@@ -23,8 +23,34 @@ media_directory = os.path.join(os.getcwd(), "media\images")
 xim_directory = os.path.join(media_directory, "XIMdata")
 
 
-class Index(ListView):
-    template_name = 'templates/index.html'
+def index_view(request):
+    if request.method == 'POST':
+        form = IndexForm(request.POST, request.FILES)
+        # delete all files saved in there before uploading new one to save storage and ensure we plot from the correct file!
+        for file in os.listdir(media_directory):
+            if file.endswith(".png") or file.endswith(".xim"):
+                os.remove(os.path.join(media_directory, file))
+
+        for file in os.listdir(xim_directory):
+            if file.endswith(".png") or file.endswith(".xim"):
+                os.remove(os.path.join(xim_directory, file))
+                
+        # determine which energy has been uploaded
+        if 'btnform6x' in request.POST and form.is_valid():
+            form.save()
+            return redirect(beam_energy_6x_display_plot)
+
+        if 'btnform10x' in request.POST and form.is_valid():
+            form.save()
+            return redirect(beam_energy_10x_display_plot)
+
+        if 'btnform10fff' in request.POST and form.is_valid():
+            form.save()
+            return redirect(beam_energy_10fff_display_plot)
+
+    else:
+        form = IndexForm()
+    return render(request, 'index.html', {'form': form})
 
 
 def beam_energy_6x(request):

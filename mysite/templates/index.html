@@ -1,8 +1,31 @@
-<!-- templates/home.html -->
-<h1>Django Image Uploading</h1>
-<ul>
-  {% for Energy in object_list %}
-    <h2>{{ Energy.title }}</h2>
-    <img src="{{ Energy.energy_Img.url}}" alt="{{ Energy.title }}">
-  {% endfor %}
-</ul>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="">
+  <meta name="author" content="">
+  <title>Upload XIM Image for Calibration to the Water Phantom Dose Measurements</title>
+</head>
+<body>
+<p><h1>Upload XIM Image for Calibration to the Water Phantom Dose Measurements</h1></p>
+<p><h1>6x Beam Energy</h1></p>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+   {{ form.as_p }}
+  <button type="submit" name = "btnform6x">Upload</button>
+</form>
+<p><h1>10x Beam Energy</h1></p>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+   {{ form.as_p }}
+  <button type="submit" name="btnform10x">Upload</button>
+</form>
+<p><h1>10xFFF Beam Energy</h1></p>
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+   {{ form.as_p }}
+  <button type="submit" name="btnform10fff">Upload</button>
+</form>
+</body>
+</html>

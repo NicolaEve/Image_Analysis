@@ -2,6 +2,12 @@ from django import forms
 from .models import *
 
 
+class IndexForm(forms.ModelForm):
+    class Meta:
+        model = IndexModel
+        fields = ('image',)
+
+
 class BeamEnergy6xForm(forms.ModelForm):
     class Meta:
         model = BeamEnergy6x

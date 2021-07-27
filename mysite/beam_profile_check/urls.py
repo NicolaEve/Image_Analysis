@@ -3,7 +3,8 @@ from django.urls import path
 from .views import *
 
 urlpatterns = [
-    path('', Index.as_view(), name='index'),
+    #path('', Index.as_view(), name='Index'),
+    path('', index_view, name='index_view'),
     path('6x/', beam_energy_6x, name='beam_energy_6x'),
     path('6xplot/', beam_energy_6x_display_plot, name='beam_energy_6x_display_plot'),
     path('10x/,', beam_energy_10x, name='beam_energy_10x'),

@@ -10,8 +10,13 @@ from django.db import models
 from .main import *
 import numpy as np
 
-#class Index(models.Model):
-# need to make a model for the index page to avoid query improperly configured error
+
+class IndexModel(models.Model):
+    """ Class for the index page """
+    image = models.FileField(upload_to='images/')
+
+    class Meta:
+        db_table = "index_page"
 
 
 class BeamEnergy6x(models.Model):
