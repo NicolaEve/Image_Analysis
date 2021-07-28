@@ -14,13 +14,13 @@ import csv
 import pyodbc
 
 # define the directories
-media_directory = r"C:\Users\NCompton\PycharmProjects\ImageAnalysis_venv_2\mysite\media\images"
+media_directory = os.path.join(os.getcwd(), "media\images")
 xim_directory = os.path.join(media_directory, "XIMdata")
 dir = r"Y:\TDS\H192138\MPCChecks"
 
 # set up connection to the MPC database
 cnxn_str = ("Driver={SQL Server Native Client 11.0};"
-            "Server=IT049561\SQLEXPRESS;"
+            "Server=.\SQLEXPRESS;"
             "Database=MPC;"
             "Trusted_Connection=yes;")
 dbo = pyodbc.connect(cnxn_str)
